@@ -62,30 +62,29 @@ def build_ui():
 
     # -- Sidebar -----------------------------------------------------------
     with ui.element("div").classes("sidebar"):
-        ui.label("OmniContext").style(
-            "font-size:18px;font-weight:700;color:#e8eaf0;margin-bottom:8px"
-        )
+        with ui.row().style("align-items:center;gap:12px;margin-bottom:8px"):
+            ui.icon("psychology").classes("text-gradient").style("font-size:28px;")
+            ui.label("OmniContext").classes("text-gradient").style("font-size:22px;font-weight:800;letter-spacing:-0.02em;")
+        
         ui.label("ambient memory").style(
-            "font-size:11px;color:#6366f1;margin-bottom:32px"
+            "font-size:12px;color:var(--text-muted);margin-bottom:32px;letter-spacing:0.1em;text-transform:uppercase;font-weight:600"
         )
 
-        status_html = ui.html("").style("margin-bottom:24px")
+        status_html = ui.html("").style("margin-bottom:32px")
 
         nav_items = [
-            ("brain", "Brain"),
-            ("search", "Search"),
-            ("timeline", "Timeline"),
-            ("sessions", "Sessions"),
-            ("settings", "Settings"),
+            ("brain", "psychology", "Brain"),
+            ("search", "search", "Search"),
+            ("timeline", "view_timeline", "Timeline"),
+            ("sessions", "folder", "Sessions"),
+            ("settings", "settings", "Settings"),
         ]
 
         nav_labels: dict = {}
-        for tab_id, label in nav_items:
-            btn = ui.button(label).props("flat").style(
-                "width:100%;text-align:left;justify-content:flex-start;"
-                "padding:10px 12px;border-radius:8px;font-size:13px;"
-                "color:#7a829a;font-weight:500;transition:all .15s;"
-            )
+        for tab_id, icon, label in nav_items:
+            with ui.element("div").classes("oc-tab") as btn:
+                ui.icon(icon).style("font-size:20px")
+                ui.label(label).style("font-size:15px;font-weight:600")
             nav_labels[tab_id] = btn
 
     main_area = ui.element("div").classes("main-content")
@@ -96,32 +95,29 @@ def build_ui():
             s = await _api("get", "/status")
             state.status = s
             capturing = s.get("capturing", False)
-            dot_color = "#22c55e" if capturing else "#f59e0b"
+            dot_color = "var(--success)" if capturing else "var(--warning)"
             status_label = "Capturing" if capturing else "Paused"
             events = s.get("event_count", 0)
             ollama = "✓ Ollama" if s.get("ollama_available") else "✗ Ollama"
             status_html.set_content(f"""
-                <div style="font-size:12px;color:#7a829a;line-height:2">
-                    <span style="color:{dot_color}">●</span> {status_label}<br>
-                    {events:,} memories<br>
-                    {s.get('session_count',0)} sessions<br>
-                    <span style="color:{'#22c55e' if s.get('ollama_available') else '#ef4444'}">{ollama}</span>
+                <div style="font-size:13px;color:var(--text-muted);line-height:2.2;font-weight:500">
+                    <span class="status-dot {'active' if capturing else 'paused'}"></span> &nbsp;{status_label}<br>
+                    <span style="color:var(--text-main)">{events:,}</span> memories<br>
+                    <span style="color:var(--text-main)">{s.get('session_count',0)}</span> sessions<br>
+                    <span style="color:{'var(--success)' if s.get('ollama_available') else 'var(--danger)'}">{ollama}</span>
                 </div>
             """)
         except Exception:
             status_html.set_content('<div style="font-size:12px;color:#ef4444">● API offline</div>')
 
-    # ── Tab switching ─────────────────────────────────────────────────────
+    # -- Tab switching -----------------------------------------------------
     def switch_tab(tab_id: str):
         state.active_tab = tab_id
         for tid, btn in nav_labels.items():
-            color = "#6366f1" if tid == tab_id else "#7a829a"
-            bg = "rgba(99,102,241,.15)" if tid == tab_id else "transparent"
-            btn.style(
-                f"width:100%;text-align:left;justify-content:flex-start;"
-                f"padding:10px 12px;border-radius:8px;font-size:13px;"
-                f"color:{color};font-weight:500;background:{bg};transition:all .15s;"
-            )
+            if tid == tab_id:
+                btn.classes(add="active")
+            else:
+                btn.classes(remove="active")
         main_area.clear()
         with main_area:
             if tab_id == "brain":
@@ -135,7 +131,7 @@ def build_ui():
             elif tab_id == "settings":
                 build_settings_tab(state)
 
-    for tab_id, _ in nav_items:
+    for tab_id, _, _ in nav_items:
         nav_labels[tab_id].on("click", lambda t=tab_id: switch_tab(t))
 
     # Initial render
@@ -154,11 +150,11 @@ def build_search_tab(state: AppState):
     query_val = {"v": ""}
     results_container = None
 
-    ui.label("Search your memory").style(
-        "font-size:28px;font-weight:700;margin-bottom:8px"
+    ui.label("Search your memory").classes("text-gradient").style(
+        "font-size:32px;font-weight:800;margin-bottom:8px"
     )
     ui.label("Ask anything about what you were doing").style(
-        "font-size:14px;color:#7a829a;margin-bottom:32px"
+        "font-size:14px;color:var(--text-muted);margin-bottom:40px"
     )
 
     search_input = ui.input(placeholder="What were you working on yesterday?").style(
@@ -227,20 +223,20 @@ def _render_result_card(ev: dict, score: float):
                         f'<span class="oc-pill oc-pill-accent">{escape(app_name[:30])}</span>'
                     )
                 ui.label(title[:80]).style(
-                    "font-size:14px;font-weight:600;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                    "font-size:15px;font-weight:600;color:var(--text-main);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
                 )
 
             # Summary
             summary = ev.get("summary", "")
             if summary:
-                ui.label(summary[:200]).style("font-size:13px;color:#9ca3af;margin-bottom:8px;line-height:1.5")
+                ui.label(summary[:200]).style("font-size:13px;color:var(--text-muted);margin-bottom:8px;line-height:1.6")
 
             # Topics + time
             with ui.row().style("align-items:center;gap:8px;flex-wrap:wrap"):
                 for topic in (ev.get("topics") or [])[:4]:
                     ui.html(f'<span class="oc-pill">{escape(str(topic))}</span>')
                 ts = _fmt_time(ev.get("timestamp", ""))
-                ui.label(ts).style("font-size:11px;color:#4b5563;margin-left:auto")
+                ui.label(ts).style("font-size:12px;color:rgba(255,255,255,0.4);margin-left:auto")
 
             # Score bar
             bar_w = min(100, int(score * 500))
@@ -252,9 +248,9 @@ def _render_result_card(ev: dict, score: float):
 # ── Timeline tab ──────────────────────────────────────────────────────────
 
 def build_timeline_tab(state: AppState):
-    ui.label("Timeline").style("font-size:28px;font-weight:700;margin-bottom:8px")
+    ui.label("Timeline").classes("text-gradient").style("font-size:32px;font-weight:800;margin-bottom:8px")
     ui.label("Your recent captures in chronological order").style(
-        "font-size:14px;color:#7a829a;margin-bottom:32px"
+        "font-size:14px;color:var(--text-muted);margin-bottom:40px"
     )
 
     container = ui.element("div").style("max-width:900px")
@@ -277,8 +273,8 @@ def build_timeline_tab(state: AppState):
                         day = ts[:10]
                     if day != prev_day:
                         ui.label(day).style(
-                            "font-size:11px;font-weight:600;text-transform:uppercase;"
-                            "letter-spacing:.08em;color:#6366f1;margin:24px 0 12px"
+                            "font-size:14px;font-weight:700;color:var(--accent);margin:32px 0 16px 0;"
+                            "text-transform:uppercase;letter-spacing:0.1em;border-bottom:1px solid var(--border);padding-bottom:8px;"
                         )
                         prev_day = day
                     _render_result_card(ev, 0)
@@ -292,9 +288,9 @@ def build_timeline_tab(state: AppState):
 # ── Sessions tab ──────────────────────────────────────────────────────────
 
 def build_sessions_tab(state: AppState):
-    ui.label("Sessions").style("font-size:28px;font-weight:700;margin-bottom:8px")
+    ui.label("Sessions").classes("text-gradient").style("font-size:32px;font-weight:800;margin-bottom:8px")
     ui.label("Activity sessions grouped by context").style(
-        "font-size:14px;color:#7a829a;margin-bottom:32px"
+        "font-size:14px;color:var(--text-muted);margin-bottom:40px"
     )
 
     container = ui.element("div").style(
@@ -314,15 +310,15 @@ def build_sessions_tab(state: AppState):
                 for s in sessions:
                     with ui.element("div").classes("oc-card"):
                         topic = s.get("topic") or "Unnamed Session"
-                        ui.label(topic[:40]).style("font-size:15px;font-weight:600;margin-bottom:8px")
+                        ui.label(topic[:40]).style("font-size:16px;font-weight:700;margin-bottom:8px;color:var(--text-main)")
                         start = _fmt_time(s.get("start_time", ""))
                         ec = s.get("event_count", 0)
                         ui.label(f"{start}  -  {ec} captures").style(
-                            "font-size:12px;color:#7a829a"
+                            "font-size:12px;color:var(--text-muted)"
                         )
                         if s.get("summary"):
                             ui.label(s["summary"][:120]).style(
-                                "font-size:12px;color:#9ca3af;margin-top:8px;line-height:1.5"
+                                "font-size:13px;color:rgba(255,255,255,0.6);margin-top:12px;line-height:1.6"
                             )
         except Exception as exc:
             with container:
@@ -334,9 +330,9 @@ def build_sessions_tab(state: AppState):
 # -- Settings tab ----------------------------------------------------------
 
 def build_settings_tab(state: AppState):
-    ui.label("Settings").style("font-size:28px;font-weight:700;margin-bottom:8px")
+    ui.label("Settings").classes("text-gradient").style("font-size:32px;font-weight:800;margin-bottom:8px")
     ui.label("Configure OmniContext behaviour").style(
-        "font-size:14px;color:#7a829a;margin-bottom:32px"
+        "font-size:14px;color:var(--text-muted);margin-bottom:40px"
     )
 
     settings_data = {}
@@ -467,17 +463,13 @@ def _render_cluster_card(cluster: dict, accent: str, glow: str, on_click):
     app         = cluster.get("dominant_app", "")
     co_entities = cluster.get("co_entities", [])
 
-    with ui.element("div").style(
-        f"background:#161a23;border:1px solid {accent};border-radius:12px;"
-        f"padding:16px;cursor:pointer;transition:all .2s;"
-        f"box-shadow:0 0 0 0 {glow};"
-    ).on("click", on_click).on(
-        "mouseenter", lambda e: None
-    ):
+    with ui.element("div").classes("oc-card").style(
+        f"border-color:{accent};"
+    ).on("click", on_click):
         # Top row: name + count badge
         with ui.row().style("align-items:center;justify-content:space-between;margin-bottom:10px"):
             ui.label(name[:32]).style(
-                f"font-size:15px;font-weight:600;color:#e8eaf0;"
+                f"font-size:15px;font-weight:700;color:var(--text-main);"
                 f"overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px"
             )
             ui.html(
@@ -488,15 +480,14 @@ def _render_cluster_card(cluster: dict, accent: str, glow: str, on_click):
 
         # Dominant app
         if app:
-            ui.label(app[:30]).style("font-size:11px;color:#7a829a;margin-bottom:8px")
+            ui.label(app[:30]).style("font-size:12px;color:var(--text-muted);margin-bottom:8px")
 
         # Co-entity pills
         if co_entities:
             with ui.row().style("gap:6px;flex-wrap:wrap"):
                 for co in co_entities[:4]:
                     ui.html(
-                        f'<span style="background:#1e2330;border:1px solid #2a3045;'
-                        f'border-radius:16px;padding:2px 8px;font-size:10px;color:#9ca3af">'
+                        f'<span class="oc-pill">'
                         f'{co[:20]}</span>'
                     )
 
@@ -508,11 +499,11 @@ def build_brain_tab(state: AppState):
     detail_container = None
 
     # ── Header ────────────────────────────────────────────────────────────
-    with ui.row().style("align-items:center;justify-content:space-between;margin-bottom:4px"):
-        ui.label("Your Digital Brain").style("font-size:28px;font-weight:700")
+    with ui.row().style("align-items:center;justify-content:space-between;margin-bottom:8px"):
+        ui.label("Your Digital Brain").classes("text-gradient").style("font-size:32px;font-weight:800")
 
     ui.label("Your activity, auto-clustered by topic").style(
-        "font-size:14px;color:#7a829a;margin-bottom:28px"
+        "font-size:14px;color:var(--text-muted);margin-bottom:40px"
     )
 
     clusters_area = ui.element("div")
