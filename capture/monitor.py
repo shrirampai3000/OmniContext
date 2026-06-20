@@ -21,11 +21,11 @@ try:
 except ImportError:
     _WIN32_AVAILABLE = False
 
-import config as cfg
 from capture.screenshot import capture_screenshot
 from capture.session import SessionTracker
 from storage.database import insert_event
 from storage.models import Event
+from storage.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -44,13 +44,13 @@ def _get_active_window() -> tuple[str, str]:
         return "", ""
 
 
-def _is_excluded(window_title: str, process_name: str) -> bool:
+def _is_excluded(window_title: str, process_name: str, settings) -> bool:
     title_lower = window_title.lower()
     proc_lower = process_name.lower()
-    for excl in cfg.EXCLUDED_APPS:
+    for excl in settings.excluded_apps:
         if excl.lower() in proc_lower:
             return True
-    for excl in cfg.EXCLUDED_TITLES:
+    for excl in settings.excluded_titles:
         if excl.lower() in title_lower:
             return True
     return False
@@ -67,11 +67,11 @@ class ActivityMonitor:
     pipeline queue for downstream processing.
     """
 
-    def __init__(self, pipeline_queue: queue.Queue) -> None:
+    def __init__(self, pipeline_queue: queue.Queue, start_paused: bool = False) -> None:
         self._queue = pipeline_queue
         self._session = SessionTracker()
         self._running = False
-        self._paused = False
+        self._paused = start_paused
 
         self._last_title: str = ""
         self._last_app: str = ""
@@ -118,6 +118,7 @@ class ActivityMonitor:
     def _window_loop(self) -> None:
         while self._running:
             try:
+                settings = get_settings()
                 title, app = _get_active_window()
                 now = time.time()
 
@@ -128,7 +129,7 @@ class ActivityMonitor:
                 should_capture = False
                 reason = ""
 
-                if not self._paused and not _is_excluded(title, app):
+                if not self._paused and not _is_excluded(title, app, settings):
                     # 1. Window changed
                     if title and (title != self._last_title or app != self._last_app):
                         should_capture = True
@@ -137,8 +138,8 @@ class ActivityMonitor:
                     # 2. Periodic interval during active work
                     elif (
                         title
-                        and (now - self._last_capture_time) >= cfg.CAPTURE_INTERVAL_SECONDS
-                        and (now - self._last_activity_time) < cfg.IDLE_THRESHOLD_SECONDS
+                        and (now - self._last_capture_time) >= settings.capture_interval_seconds
+                        and (now - self._last_activity_time) < settings.idle_threshold_seconds
                     ):
                         should_capture = True
                         reason = "periodic"
@@ -150,29 +151,31 @@ class ActivityMonitor:
                 self._last_app = app
 
             except Exception as exc:
-                logger.error("Monitor loop error: %s", exc)
+                logger.error("Monitor loop error: %s", exc, exc_info=True)
 
-            time.sleep(cfg.WINDOW_POLL_INTERVAL)
+            time.sleep(0.5)
 
     def _clipboard_loop(self) -> None:
         while self._running:
             try:
-                if not self._paused:
+                settings = get_settings()
+                if not self._paused and settings.clipboard_capture_enabled:
                     try:
                         clip = pyperclip.paste() or ""
-                    except Exception:
+                    except pyperclip.PyperclipException as exc:
+                        logger.warning("Could not access clipboard: %s", exc)
                         clip = ""
 
                     if clip and clip != self._last_clipboard:
                         title, app = _get_active_window()
-                        if not _is_excluded(title, app):
+                        if not _is_excluded(title, app, settings):
                             self._do_capture(title, app, clip, "clipboard")
                         self._last_clipboard = clip
 
             except Exception as exc:
-                logger.error("Clipboard loop error: %s", exc)
+                logger.error("Clipboard loop error: %s", exc, exc_info=True)
 
-            time.sleep(cfg.CLIPBOARD_POLL_INTERVAL)
+            time.sleep(1.0)
 
     def _do_capture(
         self,

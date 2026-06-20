@@ -10,3 +10,14 @@ __pycache__/
 *.log
 .venv/
 venv/
+
+# Runtime and data
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.index
+*.webp
+.env.*
+!.env.example

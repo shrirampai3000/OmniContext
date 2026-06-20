@@ -8,7 +8,8 @@ import api.routes as routes
 import config as cfg
 import storage.database as db
 import storage.vector_store as vector_store
-from storage.models import Event
+from storage.models import Event, SettingsPatch
+import storage.settings as settings
 
 
 def _use_temp_db(monkeypatch, tmp_path):
@@ -67,12 +68,16 @@ def test_vector_store_skips_zero_vectors_and_persists_deletes(monkeypatch, tmp_p
     assert reloaded.search(vector, top_k=5) == []
 
 
-def test_settings_patch_updates_runtime_config(monkeypatch):
-    monkeypatch.setattr(cfg, "CAPTURE_INTERVAL_SECONDS", 90)
-    monkeypatch.setattr(cfg, "IDLE_THRESHOLD_SECONDS", 120)
-    monkeypatch.setattr(cfg, "OLLAMA_BASE_URL", "http://localhost:11434")
-    monkeypatch.setattr(cfg, "SCREENSHOT_QUALITY", 75)
+def test_settings_persistence_and_patch(monkeypatch, tmp_path):
+    monkeypatch.setattr(cfg, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(settings, "_SETTINGS_FILE", tmp_path / "settings.json")
+    settings._current_settings = None
 
+    # Load defaults
+    s = settings.get_settings()
+    assert s.capture_interval_seconds == 90
+
+    # Patch settings via API-like flow
     app = FastAPI()
     app.include_router(routes.router)
     client = TestClient(app)
@@ -80,19 +85,27 @@ def test_settings_patch_updates_runtime_config(monkeypatch):
     response = client.patch(
         "/settings",
         json={
-            "capture_interval_seconds": 3,
-            "idle_threshold_seconds": 5,
+            "capture_interval_seconds": 5,  # Min bound
+            "idle_threshold_seconds": 5,    # Min bound
             "ollama_base_url": "http://localhost:11434/",
-            "screenshot_quality": 150,
+            "screenshot_quality": 150,      # Max bound
+            "clipboard_capture_enabled": True,
         },
     )
     assert response.status_code == 200
 
-    settings = client.get("/settings").json()
-    assert settings["capture_interval_seconds"] == 5
-    assert settings["idle_threshold_seconds"] == 10
-    assert settings["ollama_base_url"] == "http://localhost:11434"
-    assert settings["screenshot_quality"] == 100
+    s2 = client.get("/settings").json()
+    assert s2["capture_interval_seconds"] == 5
+    assert s2["idle_threshold_seconds"] == 5
+    assert s2["ollama_base_url"] == "http://localhost:11434"
+    assert s2["screenshot_quality"] == 100
+    assert s2["clipboard_capture_enabled"] is True
+    
+    # Check disk persistence
+    settings._current_settings = None
+    s3 = settings.get_settings()
+    assert s3.capture_interval_seconds == 5
+    assert s3.clipboard_capture_enabled is True
 
 
 def test_delete_event_removes_db_screenshot_and_vector(monkeypatch, tmp_path):

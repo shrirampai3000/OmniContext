@@ -41,166 +41,7 @@ def _screenshot_src(event_id: str) -> str:
     return f"{API_BASE}/events/{event_id}/screenshot"
 
 
-# ── CSS ───────────────────────────────────────────────────────────────────
-
-GLOBAL_CSS = """
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
-:root {
-    --bg: #0d0f14;
-    --surface: #161a23;
-    --surface2: #1e2330;
-    --border: #2a3045;
-    --accent: #6366f1;
-    --accent-glow: rgba(99,102,241,0.25);
-    --text: #e8eaf0;
-    --text-muted: #7a829a;
-    --success: #22c55e;
-    --warning: #f59e0b;
-    --danger: #ef4444;
-}
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-    font-family: 'Inter', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-}
-
-.oc-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px;
-    transition: border-color .2s, box-shadow .2s;
-    cursor: pointer;
-}
-.oc-card:hover {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 1px var(--accent-glow), 0 4px 20px rgba(0,0,0,.4);
-}
-
-.oc-pill {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 3px 10px;
-    font-size: 11px;
-    color: var(--text-muted);
-    display: inline-block;
-}
-
-.oc-pill-accent {
-    background: var(--accent-glow);
-    border-color: var(--accent);
-    color: var(--accent);
-}
-
-.search-input {
-    background: var(--surface2) !important;
-    border: 1.5px solid var(--border) !important;
-    border-radius: 10px !important;
-    color: var(--text) !important;
-    font-size: 16px !important;
-}
-.search-input:focus-within {
-    border-color: var(--accent) !important;
-    box-shadow: 0 0 0 3px var(--accent-glow) !important;
-}
-
-.oc-tab {
-    color: var(--text-muted);
-    font-size: 13px;
-    font-weight: 500;
-    padding: 8px 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all .15s;
-    border: none;
-    background: transparent;
-}
-.oc-tab:hover { color: var(--text); background: var(--surface2); }
-.oc-tab.active { color: var(--accent); background: var(--accent-glow); }
-
-.status-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-}
-.status-dot.active { background: var(--success); box-shadow: 0 0 6px var(--success); }
-.status-dot.paused { background: var(--warning); }
-
-.sidebar {
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    min-height: 100vh;
-    width: 220px;
-    padding: 24px 16px;
-    position: fixed;
-    left: 0; top: 0;
-}
-
-.main-content {
-    margin-left: 220px;
-    padding: 32px;
-    min-height: 100vh;
-}
-
-.thumb {
-    width: 120px;
-    height: 75px;
-    object-fit: cover;
-    border-radius: 6px;
-    border: 1px solid var(--border);
-    flex-shrink: 0;
-}
-
-.score-bar {
-    height: 3px;
-    border-radius: 2px;
-    background: linear-gradient(90deg, var(--accent), #818cf8);
-}
-
-.empty-state {
-    text-align: center;
-    padding: 80px 40px;
-    color: var(--text-muted);
-}
-
-.section-title {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .08em;
-    color: var(--text-muted);
-    margin-bottom: 12px;
-}
-
-.modal-overlay {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,.7);
-    backdrop-filter: blur(4px);
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.modal-box {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 24px;
-    max-width: 900px;
-    width: 90vw;
-    max-height: 80vh;
-    overflow-y: auto;
-}
-"""
-
-
-# ── State ─────────────────────────────────────────────────────────────────
+# -- State -----------------------------------------------------------------
 
 class AppState:
     def __init__(self):
@@ -210,14 +51,16 @@ class AppState:
         self.modal_event: Optional[dict] = None
 
 
-# ── Page builder ──────────────────────────────────────────────────────────
+# -- Page builder ----------------------------------------------------------
 
 def build_ui():
     state = AppState()
 
-    ui.add_head_html(f"<style>{GLOBAL_CSS}</style>")
+    css_path = Path(__file__).parent / "styles.css"
+    if css_path.exists():
+        ui.add_head_html(f"<style>{css_path.read_text(encoding='utf-8')}</style>")
 
-    # ── Sidebar ───────────────────────────────────────────────────────────
+    # -- Sidebar -----------------------------------------------------------
     with ui.element("div").classes("sidebar"):
         ui.label("OmniContext").style(
             "font-size:18px;font-weight:700;color:#e8eaf0;margin-bottom:8px"
@@ -229,11 +72,11 @@ def build_ui():
         status_html = ui.html("", sanitize=False).style("margin-bottom:24px")
 
         nav_items = [
-            ("brain", "🧠  Brain"),
-            ("search", "🔍  Search"),
-            ("timeline", "📋  Timeline"),
-            ("sessions", "📂  Sessions"),
-            ("settings", "⚙️  Settings"),
+            ("brain", "Brain"),
+            ("search", "Search"),
+            ("timeline", "Timeline"),
+            ("sessions", "Sessions"),
+            ("settings", "Settings"),
         ]
 
         nav_labels: dict = {}
@@ -479,7 +322,7 @@ def build_sessions_tab(state: AppState):
                         ui.label(topic[:40]).style("font-size:15px;font-weight:600;margin-bottom:8px")
                         start = _fmt_time(s.get("start_time", ""))
                         ec = s.get("event_count", 0)
-                        ui.label(f"{start}  ·  {ec} captures").style(
+                        ui.label(f"{start}  -  {ec} captures").style(
                             "font-size:12px;color:#7a829a"
                         )
                         if s.get("summary"):
@@ -493,7 +336,7 @@ def build_sessions_tab(state: AppState):
     ui.timer(0.1, load_sessions, once=True)
 
 
-# ── Settings tab ──────────────────────────────────────────────────────────
+# -- Settings tab ----------------------------------------------------------
 
 def build_settings_tab(state: AppState):
     ui.label("Settings").style("font-size:28px;font-weight:700;margin-bottom:8px")
@@ -516,21 +359,41 @@ def build_settings_tab(state: AppState):
     def render_settings(s: dict):
         container.clear()
         with container:
-            # Capture
-            ui.label("Capture").classes("section-title").style("margin-top:0")
+            # Privacy & Capture Controls
+            ui.label("Privacy & Capture").classes("section-title").style("margin-top:0")
             with ui.element("div").classes("oc-card").style("margin-bottom:20px"):
                 interval = ui.number(
                     label="Screenshot interval (seconds)",
                     value=s.get("capture_interval_seconds", 90),
                     min=10, max=600, step=10,
                 ).style("width:100%;margin-bottom:12px")
+                
+                clipboard_toggle = ui.checkbox(
+                    "Enable Clipboard Capture",
+                    value=s.get("clipboard_capture_enabled", False),
+                ).style("margin-bottom:12px")
+                
+                paused_toggle = ui.checkbox(
+                    "Start Paused (Do not capture until manually resumed)",
+                    value=s.get("capture_paused_on_startup", True),
+                ).style("margin-bottom:12px")
+                
+                retention = ui.number(
+                    label="Retention period (days)",
+                    value=s.get("retention_days", 30),
+                    min=1, max=3650, step=1,
+                ).style("width:100%;margin-bottom:12px")
 
-                async def save_interval():
-                    await _api("patch", "/settings",
-                               json={"capture_interval_seconds": int(interval.value)})
+                async def save_privacy():
+                    await _api("patch", "/settings", json={
+                        "capture_interval_seconds": int(interval.value),
+                        "clipboard_capture_enabled": bool(clipboard_toggle.value),
+                        "capture_paused_on_startup": bool(paused_toggle.value),
+                        "retention_days": int(retention.value),
+                    })
                     ui.notify("Saved", type="positive", position="bottom-right")
 
-                ui.button("Save", on_click=save_interval).props("flat").style(
+                ui.button("Save", on_click=save_privacy).props("flat").style(
                     "color:#6366f1;font-size:12px"
                 )
 
@@ -594,7 +457,7 @@ def build_settings_tab(state: AppState):
 # ── Entry point ───────────────────────────────────────────────────────────
 
 
-# ── Brain tab ─────────────────────────────────────────────────────────────────
+# -- Brain tab -----------------------------------------------------------------
 
 _WINDOW_COLORS = {
     "today":      {"accent": "#6366f1", "glow": "rgba(99,102,241,.18)", "label": "Today"},

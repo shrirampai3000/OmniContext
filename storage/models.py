@@ -77,6 +77,25 @@ class StatusResponse(BaseModel):
     version: str
 
 
+class Settings(BaseModel):
+    capture_interval_seconds: int = 90
+    idle_threshold_seconds: int = 120
+    excluded_apps: List[str] = [
+        "keepass", "1password", "bitwarden", "lastpass", "dashlane",
+        "enpass", "roboform", "passwordsafe", "authy", "authenticator"
+    ]
+    excluded_titles: List[str] = ["private", "incognito", "inprivate", "- private browsing"]
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_vision_model: str = "llava"
+    ollama_text_model: str = "mistral"
+    ocr_gpu: bool = False
+    screenshot_quality: int = 75
+    # Privacy controls
+    clipboard_capture_enabled: bool = False
+    capture_paused_on_startup: bool = True
+    retention_days: int = 30
+
+
 class SettingsPatch(BaseModel):
     capture_interval_seconds: Optional[int] = None
     idle_threshold_seconds: Optional[int] = None
@@ -87,3 +106,6 @@ class SettingsPatch(BaseModel):
     ollama_text_model: Optional[str] = None
     ocr_gpu: Optional[bool] = None
     screenshot_quality: Optional[int] = None
+    clipboard_capture_enabled: Optional[bool] = None
+    capture_paused_on_startup: Optional[bool] = None
+    retention_days: Optional[int] = None

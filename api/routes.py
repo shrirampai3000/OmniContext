@@ -1,5 +1,5 @@
 """
-OmniContext — FastAPI REST API routes.
+OmniContext - FastAPI REST API routes.
 Mounts on the shared app instance created in main.py.
 """
 
@@ -31,6 +31,7 @@ from storage.models import (
     SettingsPatch,
     StatusResponse,
 )
+from storage.settings import get_settings as get_app_settings, update_settings
 from storage.vector_store import get_vector_store
 
 logger = logging.getLogger(__name__)
@@ -151,48 +152,19 @@ def resume_capture():
     return {"capturing": True}
 
 
-# ── Settings ──────────────────────────────────────────────────────────────────
+# -- Settings ------------------------------------------------------------------
 
 @router.get("/settings", tags=["settings"])
 def get_settings():
-    return {
-        "capture_interval_seconds": cfg.CAPTURE_INTERVAL_SECONDS,
-        "idle_threshold_seconds": cfg.IDLE_THRESHOLD_SECONDS,
-        "excluded_apps": cfg.EXCLUDED_APPS,
-        "excluded_titles": cfg.EXCLUDED_TITLES,
-        "ollama_base_url": cfg.OLLAMA_BASE_URL,
-        "ollama_vision_model": cfg.OLLAMA_VISION_MODEL,
-        "ollama_text_model": cfg.OLLAMA_TEXT_MODEL,
-        "embedding_model": cfg.EMBEDDING_MODEL,
-        "ocr_gpu": cfg.OCR_GPU,
-        "screenshot_quality": cfg.SCREENSHOT_QUALITY,
-    }
+    return get_app_settings().model_dump()
 
 
 @router.patch("/settings", tags=["settings"])
 def patch_settings(body: SettingsPatch):
     """
-    Runtime patch — updates the in-memory config values.
-    Changes persist only until restart; write to config.py for permanence.
+    Runtime patch -- updates the persistent config values.
     """
-    if body.capture_interval_seconds is not None:
-        cfg.CAPTURE_INTERVAL_SECONDS = max(5, min(3600, body.capture_interval_seconds))
-    if body.idle_threshold_seconds is not None:
-        cfg.IDLE_THRESHOLD_SECONDS = max(10, min(24 * 3600, body.idle_threshold_seconds))
-    if body.excluded_apps is not None:
-        cfg.EXCLUDED_APPS = body.excluded_apps
-    if body.excluded_titles is not None:
-        cfg.EXCLUDED_TITLES = body.excluded_titles
-    if body.ollama_base_url is not None:
-        cfg.OLLAMA_BASE_URL = body.ollama_base_url.rstrip("/")
-    if body.ollama_vision_model is not None:
-        cfg.OLLAMA_VISION_MODEL = body.ollama_vision_model
-    if body.ollama_text_model is not None:
-        cfg.OLLAMA_TEXT_MODEL = body.ollama_text_model
-    if body.ocr_gpu is not None:
-        cfg.OCR_GPU = body.ocr_gpu
-    if body.screenshot_quality is not None:
-        cfg.SCREENSHOT_QUALITY = max(1, min(100, body.screenshot_quality))
+    update_settings(body)
     return {"updated": True}
 
 

@@ -61,11 +61,12 @@ def hybrid_search(
     query: str,
     top_k: int = SEARCH_TOP_K,
     time_filter_hours: Optional[float] = None,
+    search_mode: str = "hybrid",  # "keyword", "semantic", or "hybrid"
 ) -> List[SearchResult]:
     """
     Full hybrid search pipeline.
-    1. FTS5 keyword search
-    2. FAISS vector nearest-neighbours
+    1. Conditionally run FTS5 keyword search
+    2. Conditionally run FAISS vector nearest-neighbours
     3. RRF merge
     4. Recency boost (post-processing)
     5. Fetch full Event objects
@@ -76,17 +77,25 @@ def hybrid_search(
     if not query.strip():
         return []
 
+    fts_results = []
+    vec_results = []
+
     # ── 1. FTS5 ──────────────────────────────────────────────────────────────
-    fts_results = fts_search(query, limit=top_k * 2)
-    logger.debug("FTS returned %d results for %r", len(fts_results), query)
+    if search_mode in ("keyword", "hybrid"):
+        fts_results = fts_search(query, limit=top_k * 2)
+        logger.debug("FTS returned %d results for %r", len(fts_results), query)
 
     # ── 2. FAISS ─────────────────────────────────────────────────────────────
-    query_vec = embed(query)
-    store = get_vector_store()
-    vec_results = store.search(query_vec, top_k=top_k * 2)
-    # Filter out deleted slots
-    vec_results = [(eid, sc) for eid, sc in vec_results if eid not in ("__deleted__", "")]
-    logger.debug("FAISS returned %d results for %r", len(vec_results), query)
+    if search_mode in ("semantic", "hybrid"):
+        try:
+            query_vec = embed(query)
+            store = get_vector_store()
+            vec_results = store.search(query_vec, top_k=top_k * 2)
+            # Filter out deleted slots
+            vec_results = [(eid, sc) for eid, sc in vec_results if eid not in ("__deleted__", "")]
+            logger.debug("FAISS returned %d results for %r", len(vec_results), query)
+        except Exception as exc:
+            logger.warning("FAISS search failed (fallback to FTS): %s", exc)
 
     # ── 3. RRF merge ─────────────────────────────────────────────────────────
     merged = _rrf_merge(

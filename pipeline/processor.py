@@ -62,7 +62,7 @@ class PipelineWorker:
                     self._queue.task_done()
 
             except Exception as exc:
-                logger.error("Pipeline worker loop error: %s", exc)
+                logger.error("Pipeline worker loop error: %s", exc, exc_info=True)
                 time.sleep(_RETRY_DELAY)
 
     def _process(self, event: Event) -> bool:
@@ -127,7 +127,7 @@ class PipelineWorker:
             return True
 
         except Exception as exc:
-            logger.error("Failed to process event %s: %s", event.id[:8], exc)
+            logger.error("Failed to process event %s: %s", event.id[:8], exc, exc_info=True)
             return False
 
 

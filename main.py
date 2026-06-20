@@ -1,5 +1,5 @@
 """
-OmniContext — Main entry point.
+OmniContext - Main entry point.
 Mounts the API router on NiceGUI's internal FastAPI app (single-server architecture).
 Starts capture monitor + pipeline worker in background threads, then hands off to NiceGUI.
 """
@@ -18,16 +18,30 @@ from storage.vector_store import get_vector_store
 from capture.monitor import ActivityMonitor
 from pipeline.processor import PipelineWorker, reprocess_unprocessed
 from api.routes import router, set_monitor
+from ui.app import run_ui
+from fastapi.middleware.cors import CORSMiddleware
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%H:%M:%S",
 )
-logger = logging.getLogger("omnicontext")
+logger = logging.getLogger(__name__)
 
-# ── Shared pipeline queue ─────────────────────────────────────────────────
-_pipeline_queue: queue.Queue = queue.Queue(maxsize=500)
+# -- Global state -------------------------------------------------------------
+_monitor: ActivityMonitor = None
+_worker: PipelineWorker = None
+_event_queue = queue.Queue(maxsize=100)
+
+
+def _shutdown_handler(signum, frame):
+    logger.info("Shutdown signal received. Stopping threads...")
+    if _monitor:
+        _monitor.stop()
+    if _worker:
+        _worker.stop()
+    close_db()
+    sys.exit(0)
 
 
 def _register_hotkey():
@@ -40,65 +54,54 @@ def _register_hotkey():
         logger.warning("Could not register hotkey (%s): %s — try running as Administrator", HOTKEY, exc)
 
 
-def _shutdown(monitor: ActivityMonitor, worker: PipelineWorker, *args):
-    logger.info("Shutting down OmniContext…")
-    monitor.stop()
-    worker.stop()
-    get_vector_store().save()
-    close_db()
-    logger.info("Goodbye.")
-    sys.exit(0)
-
-
 def main():
-    logger.info("=" * 50)
-    logger.info("  OmniContext v0.1.0 — starting up")
-    logger.info("=" * 50)
+    global _monitor, _worker
 
-    # 1. DB
+    # Register signal handlers for clean exit
+    signal.signal(signal.SIGINT, _shutdown_handler)
+    signal.signal(signal.SIGTERM, _shutdown_handler)
+
+    # 1. Initialize storage
+    logger.info("Initializing %s...", APP_NAME)
     init_db()
-    logger.info("Database ready.")
-
-    # 2. FAISS
+    # Pre-warm FAISS lazily
     get_vector_store()
-    logger.info("Vector store ready.")
 
-    # 3. Capture monitor
-    monitor = ActivityMonitor(_pipeline_queue)
-    set_monitor(monitor)
-    start_paused = os.getenv("OMNICONTEXT_START_PAUSED", "").lower() in {"1", "true", "yes", "on"}
+    # 2. Check if we should start paused via env var
+    start_paused = os.getenv("OMNICONTEXT_START_PAUSED", "0").lower() in ("1", "true", "yes")
 
-    # 4. Pipeline worker
-    worker = PipelineWorker(_pipeline_queue)
-    worker.start()
+    # 3. Start pipeline worker (consumer)
+    logger.info("Starting pipeline worker thread...")
+    _worker = PipelineWorker(queue=_event_queue)
+    _worker.start()
 
-    # Re-queue previously unprocessed events
-    if start_paused:
-        logger.info("Start-paused mode: skipping unprocessed event requeue.")
-    else:
-        reprocess_unprocessed(_pipeline_queue)
+    # 4. Enqueue previously unprocessed events (e.g. from a crash)
+    logger.info("Checking for unprocessed events...")
+    reprocess_unprocessed(_event_queue)
 
-    # 5. Capture monitor (background threads)
-    if start_paused:
-        monitor.pause()
-    monitor.start()
-    logger.info("Activity monitor started.")
+    # 5. Start capture monitor (producer)
+    logger.info("Starting capture monitor thread (paused=%s)...", start_paused)
+    _monitor = ActivityMonitor(queue=_event_queue, start_paused=start_paused)
+    _monitor.start()
 
-    # 6. Mount API router on NiceGUI's internal FastAPI app
+    # Share monitor with API so the UI can toggle pause state
+    set_monitor(_monitor)
+
+    # 6. Mount the API router into NiceGUI's underlying FastAPI app
+    # NiceGUI uses its own FastAPI instance internally (`nicegui.app`).
     from nicegui import app as nicegui_app
-    from fastapi.middleware.cors import CORSMiddleware
     nicegui_app.include_router(router, prefix="/api")
+
+    # Tighten CORS for security
     nicegui_app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=[f"http://127.0.0.1:{UI_PORT}", f"http://localhost:{UI_PORT}"],
+        allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
     logger.info("API routes mounted on NiceGUI app under /api")
 
-    # 7. Shutdown hooks
-    signal.signal(signal.SIGINT, lambda *a: _shutdown(monitor, worker))
-    signal.signal(signal.SIGTERM, lambda *a: _shutdown(monitor, worker))
 
     # 8. Hotkey (may need admin on Windows)
     _register_hotkey()

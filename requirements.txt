@@ -25,6 +25,3 @@ keyboard>=0.13.5
 
 # System tray (optional)
 pystray>=0.19.5
-
-# Tests
-pytest>=8.0.0

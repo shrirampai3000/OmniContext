@@ -7,8 +7,8 @@ OmniContext runs on your machine, captures context-aware snapshots, extracts tex
 summarises activity with local Ollama models when available, stores embeddings in
 FAISS, and exposes a small NiceGUI interface plus a REST API.
 
-No video. No cloud API required. No continuous recording. Data stays under
-`data/` in this project folder.
+No video. No cloud API required. No continuous recording. Data stays in your 
+local application data folder.
 
 ## Features
 
@@ -45,10 +45,16 @@ back gracefully where possible. First model downloads can be large.
 
 ```powershell
 cd D:\OmniContext
-python -m pip install -r requirements.txt
+python -m pip install -e .
 ```
 
 ## Run
+
+```powershell
+scripts\run.bat
+```
+
+Or run directly:
 
 ```powershell
 python main.py
@@ -58,7 +64,7 @@ To start the UI/API without capturing immediately:
 
 ```powershell
 $env:OMNICONTEXT_START_PAUSED = "1"
-python main.py
+scripts\run.bat
 ```
 
 The UI opens at:
@@ -85,7 +91,7 @@ Administrator.
 ## Test
 
 ```powershell
-python -m pytest -q
+scripts\test.bat
 ```
 
 The smoke tests use temporary databases and vector indexes. They do not require
@@ -97,55 +103,49 @@ All routes are mounted under `/api`.
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/query` | Hybrid search query |
+| `GET` | `/api/search` | Hybrid search query |
 | `GET` | `/api/events` | List events, optionally by session |
 | `GET` | `/api/events/{id}` | Get one event |
 | `GET` | `/api/events/{id}/screenshot` | Serve event screenshot |
 | `DELETE` | `/api/events/{id}` | Delete event, screenshot, FTS row, and vector metadata |
 | `GET` | `/api/sessions` | List sessions |
 | `GET` | `/api/status` | System status |
-| `POST` | `/api/capture/pause` | Pause capture |
-| `POST` | `/api/capture/resume` | Resume capture |
+| `POST` | `/api/control/pause` | Pause capture |
+| `POST` | `/api/control/resume` | Resume capture |
 | `GET` | `/api/settings` | Read runtime settings |
-| `PATCH` | `/api/settings` | Update runtime settings until restart |
-
-Example query:
-
-```powershell
-Invoke-RestMethod `
-  -Method Post `
-  -Uri http://127.0.0.1:7071/api/query `
-  -ContentType application/json `
-  -Body '{"query":"what did I work on today?","top_k":10}'
-```
+| `PATCH` | `/api/settings` | Update persistent settings |
 
 ## Configuration
 
-Edit `config.py` for permanent changes. The Settings tab and
-`PATCH /api/settings` update runtime values until restart.
+Settings are managed via the UI Settings tab and persisted to `settings.json` 
+in the data directory. `config.py` contains core configuration paths and defaults.
 
-Common settings:
+Common settings configurable via the UI or `PATCH /api/settings`:
 
 | Setting | Default | Description |
 |---|---:|---|
-| `CAPTURE_INTERVAL_SECONDS` | `90` | Periodic screenshot interval |
-| `IDLE_THRESHOLD_SECONDS` | `120` | Skip periodic capture after this idle time |
-| `SCREENSHOT_QUALITY` | `75` | WebP screenshot quality |
-| `EXCLUDED_APPS` | list | Process-name fragments that are never captured |
-| `EXCLUDED_TITLES` | list | Window-title fragments that are never captured |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Local Ollama endpoint |
-| `OLLAMA_VISION_MODEL` | `llava` | Vision model for screenshot summaries |
-| `OLLAMA_TEXT_MODEL` | `mistral` | Text fallback model |
-| `OCR_GPU` | `False` | Enable GPU for EasyOCR |
-| `HOTKEY` | `ctrl+shift+space` | Global UI hotkey |
+| `capture_interval_seconds` | `90` | Periodic screenshot interval |
+| `idle_threshold_seconds` | `120` | Skip periodic capture after this idle time |
+| `screenshot_quality` | `75` | WebP screenshot quality |
+| `excluded_apps` | list | Process-name fragments that are never captured |
+| `excluded_titles` | list | Window-title fragments that are never captured |
+| `ollama_base_url` | `http://localhost:11434` | Local Ollama endpoint |
+| `ollama_vision_model` | `llava` | Vision model for screenshot summaries |
+| `ollama_text_model` | `mistral` | Text fallback model |
+| `clipboard_capture_enabled` | `False` | Capture text copied to clipboard |
+| `capture_paused_on_startup` | `True` | Do not capture until explicitly resumed |
 
 ## Data Location
 
+By default, data is stored in the user's Local App Data directory:
+`%LOCALAPPDATA%\OmniContext\`
+
 ```text
-data/
+%LOCALAPPDATA%\OmniContext\
   omnicontext.db      SQLite events, sessions, and FTS index
   faiss.index         FAISS vector index
   faiss_meta.json     FAISS row to event ID mapping
+  settings.json       Persistent application settings
   screenshots/        WebP captures
 ```
 
@@ -166,8 +166,10 @@ Capture monitor
 
 ```text
 OmniContext/
+  pyproject.toml          Project metadata and dependencies
   main.py                 Entry point
-  config.py               Settings
+  config.py               Static settings and defaults
+  scripts/                Batch scripts for running and testing
   api/routes.py           FastAPI routes
   capture/monitor.py      Window, clipboard, and activity watcher
   capture/screenshot.py   WebP screenshot capture
@@ -179,7 +181,9 @@ OmniContext/
   search/retrieval.py     Hybrid search
   storage/database.py     SQLite + FTS5
   storage/models.py       Pydantic models
+  storage/settings.py     Persistent settings manager
   storage/vector_store.py FAISS wrapper
   ui/app.py               NiceGUI frontend
+  ui/styles.css           Frontend stylesheet
   tests/test_core.py      Smoke tests
 ```

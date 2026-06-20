@@ -133,6 +133,27 @@ class VectorStore:
                 if eid == event_id:
                     self._meta[i] = "__deleted__"
 
+    def compact(self) -> None:
+        """
+        Rebuilds the FAISS index to permanently remove tombstones.
+        """
+        if not _FAISS_AVAILABLE or self._index is None:
+            return
+        with self._lock:
+            try:
+                new_index = faiss.IndexFlatIP(EMBEDDING_DIM)
+                new_meta = []
+                for i, eid in enumerate(self._meta):
+                    if eid not in ("__deleted__", ""):
+                        vec = self._index.reconstruct(i)
+                        new_index.add(vec.reshape(1, -1))
+                        new_meta.append(eid)
+                self._index = new_index
+                self._meta = new_meta
+                logger.info("FAISS index compacted (%d vectors).", self._index.ntotal)
+            except Exception as exc:
+                logger.error("Failed to compact FAISS index: %s", exc)
+
     @property
     def total(self) -> int:
         if not _FAISS_AVAILABLE or self._index is None:
