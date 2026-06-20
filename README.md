@@ -12,7 +12,7 @@ Operating entirely on your local machine, OmniContext captures context-aware sna
 - **Strict Privacy Controls:** Supports exclusion lists for password managers, private browsing sessions, and custom process or window title fragments. Capture can be paused entirely or disabled for specific modalities like the clipboard.
 - **Local AI Pipeline:** Integrates seamlessly with EasyOCR for text extraction, Ollama for summarization, and SentenceTransformers for generating embeddings.
 - **Hybrid Retrieval Engine:** Combines keyword search (SQLite FTS5) with semantic vector search (FAISS) using Reciprocal Rank Fusion (RRF), further optimized with recency boosting.
-- **Comprehensive UI and API:** Features a desktop-style web interface for querying memory, browsing timelines, and managing sessions, backed by a fully documented REST API.
+- **Premium UI:** Features a beautifully designed, desktop-style web interface using a pristine light-mode glassmorphism aesthetic, backed by a fully documented REST API.
 
 ## System Requirements
 
