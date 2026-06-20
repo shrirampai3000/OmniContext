@@ -1,189 +1,188 @@
 # OmniContext
 
-Local-first Windows ambient memory: sparse screenshots plus lightweight activity
-signals become searchable memories you can query later.
+OmniContext is a local-first ambient memory layer for Windows. It continuously builds a searchable, highly contextual memory of your digital activity by combining sparse screenshot captures with underlying system signals.
 
-OmniContext runs on your machine, captures context-aware snapshots, extracts text,
-summarises activity with local Ollama models when available, stores embeddings in
-FAISS, and exposes a small NiceGUI interface plus a REST API.
+Operating entirely on your local machine, OmniContext captures context-aware snapshots, performs Optical Character Recognition (OCR), generates activity summaries using local Large Language Models (LLMs) via Ollama, and stores high-dimensional embeddings in FAISS. The system exposes a comprehensive REST API alongside a lightweight NiceGUI interface for retrieval and timeline visualization.
 
-No video. No cloud API required. No continuous recording. Data stays in your 
-local application data folder.
+ OmniContext respects user privacy by design: no video is recorded, no cloud APIs are utilized, and all data remains strictly within your local environment.
 
-## Features
+## Key Features
 
-- Smart capture from active-window changes, clipboard changes, and periodic
-  intervals while you are active.
-- Privacy exclusions for password managers, private browsing windows, and any
-  custom process/title fragments you add.
-- Local AI pipeline: screenshot OCR, Ollama summarisation, sentence-transformer
-  embeddings, SQLite FTS5, and FAISS vector search.
-- Hybrid retrieval with keyword search, vector search, reciprocal-rank fusion,
-  and recency boosting.
-- NiceGUI desktop-style UI for search, timeline, sessions, capture control, and
-  runtime settings.
-- REST API under `/api` for search, event browsing, screenshots, deletes,
-  status, capture pause/resume, and settings.
+- **Intelligent Activity Capture:** Automatically captures context based on active window changes, clipboard modifications, and periodic intervals tied to user activity.
+- **Strict Privacy Controls:** Supports exclusion lists for password managers, private browsing sessions, and custom process or window title fragments. Capture can be paused entirely or disabled for specific modalities like the clipboard.
+- **Local AI Pipeline:** Integrates seamlessly with EasyOCR for text extraction, Ollama for summarization, and SentenceTransformers for generating embeddings.
+- **Hybrid Retrieval Engine:** Combines keyword search (SQLite FTS5) with semantic vector search (FAISS) using Reciprocal Rank Fusion (RRF), further optimized with recency boosting.
+- **Comprehensive UI and API:** Features a desktop-style web interface for querying memory, browsing timelines, and managing sessions, backed by a fully documented REST API.
 
-## Prerequisites
+## System Requirements
 
-- Windows 10/11
-- Python 3.10+
-- Ollama, optional but recommended for AI summaries
+- **Operating System:** Windows 10 or Windows 11
+- **Runtime:** Python 3.10 or higher
+- **Optional Dependencies:** Ollama (highly recommended for local AI summarization and embedding generation)
 
-Optional Ollama models:
+### Recommended Ollama Models
 
 ```powershell
 ollama pull llava
 ollama pull mistral
 ```
 
-If Ollama, EasyOCR, or sentence-transformers are unavailable, OmniContext falls
-back gracefully where possible. First model downloads can be large.
+*Note: If Ollama, EasyOCR, or SentenceTransformers are unavailable, the system will fall back to available capabilities. Initial model downloads may require significant bandwidth.*
 
-## Install
+## Installation
 
 ```powershell
 cd D:\OmniContext
 python -m pip install -e .
 ```
 
-## Run
+## Usage
+
+Start the application using the provided batch script:
 
 ```powershell
 scripts\run.bat
 ```
 
-Or run directly:
+Alternatively, run the Python module directly:
 
 ```powershell
 python main.py
 ```
 
-To start the UI/API without capturing immediately:
+### Privacy-First Initialization
+
+To launch the application with capturing disabled by default, set the appropriate environment variable prior to execution:
 
 ```powershell
 $env:OMNICONTEXT_START_PAUSED = "1"
 scripts\run.bat
 ```
 
-The UI opens at:
+### Accessing the Interface
 
-```text
-http://127.0.0.1:7071
-```
+Once running, the web interface and API documentation are accessible locally:
 
-Useful URLs:
+- **User Interface:** `http://127.0.0.1:7071`
+- **REST API Base URL:** `http://127.0.0.1:7071/api`
+- **Swagger Documentation:** `http://127.0.0.1:7071/api/docs`
 
-- UI: `http://127.0.0.1:7071`
-- API base: `http://127.0.0.1:7071/api`
-- API docs: `http://127.0.0.1:7071/api/docs`
+**Global UI Hotkey:** `Ctrl+Shift+Space`
+*(Depending on system configuration, the hotkey listener may require elevated administrative privileges.)*
 
-Global hotkey:
+## Testing
 
-```text
-Ctrl+Shift+Space
-```
-
-On some Windows setups, the hotkey package requires running the terminal as
-Administrator.
-
-## Test
+Execute the automated test suite using the provided script:
 
 ```powershell
 scripts\test.bat
 ```
 
-The smoke tests use temporary databases and vector indexes. They do not require
-live screenshots, Ollama, EasyOCR model downloads, or the embedding model.
+The smoke tests utilize temporary databases and vector indexes, ensuring they run independently of live system captures or heavy machine learning models.
 
 ## API Reference
 
-All routes are mounted under `/api`.
+The REST API exposes the following core endpoints under `/api`:
 
-| Method | Path | Description |
+| Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/search` | Hybrid search query |
-| `GET` | `/api/events` | List events, optionally by session |
-| `GET` | `/api/events/{id}` | Get one event |
-| `GET` | `/api/events/{id}/screenshot` | Serve event screenshot |
-| `DELETE` | `/api/events/{id}` | Delete event, screenshot, FTS row, and vector metadata |
-| `GET` | `/api/sessions` | List sessions |
-| `GET` | `/api/status` | System status |
-| `POST` | `/api/control/pause` | Pause capture |
-| `POST` | `/api/control/resume` | Resume capture |
-| `GET` | `/api/settings` | Read runtime settings |
-| `PATCH` | `/api/settings` | Update persistent settings |
+| `GET` | `/api/search` | Execute a hybrid (keyword + semantic) search query. |
+| `GET` | `/api/events` | Retrieve paginated events, optionally filtered by session. |
+| `GET` | `/api/events/{id}` | Retrieve metadata for a specific event. |
+| `GET` | `/api/events/{id}/screenshot` | Retrieve the WebP screenshot associated with an event. |
+| `DELETE` | `/api/events/{id}` | Permanently delete an event, its screenshot, and associated metadata. |
+| `GET` | `/api/sessions` | Retrieve paginated user sessions. |
+| `GET` | `/api/status` | Retrieve system health, capture state, and pipeline queue status. |
+| `POST` | `/api/control/pause` | Suspend the activity capture monitor. |
+| `POST` | `/api/control/resume` | Resume the activity capture monitor. |
+| `GET` | `/api/settings` | Retrieve current application settings. |
+| `PATCH` | `/api/settings` | Update persistent application settings. |
 
-## Configuration
+## Configuration Management
 
-Settings are managed via the UI Settings tab and persisted to `settings.json` 
-in the data directory. `config.py` contains core configuration paths and defaults.
+Settings are managed via the web interface and persisted locally to `settings.json`. Core architectural paths and static defaults are defined within `config.py`.
 
-Common settings configurable via the UI or `PATCH /api/settings`:
+The following parameters can be configured dynamically at runtime:
 
-| Setting | Default | Description |
+| Parameter | Default | Description |
 |---|---:|---|
-| `capture_interval_seconds` | `90` | Periodic screenshot interval |
-| `idle_threshold_seconds` | `120` | Skip periodic capture after this idle time |
-| `screenshot_quality` | `75` | WebP screenshot quality |
-| `excluded_apps` | list | Process-name fragments that are never captured |
-| `excluded_titles` | list | Window-title fragments that are never captured |
-| `ollama_base_url` | `http://localhost:11434` | Local Ollama endpoint |
-| `ollama_vision_model` | `llava` | Vision model for screenshot summaries |
-| `ollama_text_model` | `mistral` | Text fallback model |
-| `clipboard_capture_enabled` | `False` | Capture text copied to clipboard |
-| `capture_paused_on_startup` | `True` | Do not capture until explicitly resumed |
+| `capture_interval_seconds` | `90` | Interval between periodic screenshots during active usage. |
+| `idle_threshold_seconds` | `120` | Duration of inactivity required to suspend periodic captures. |
+| `screenshot_quality` | `75` | Compression quality for WebP screenshots (1-100). |
+| `excluded_apps` | `[...]` | Process names to strictly ignore during capture. |
+| `excluded_titles` | `[...]` | Window titles to strictly ignore during capture. |
+| `ollama_base_url` | `http://localhost:11434` | Endpoint for the local Ollama instance. |
+| `ollama_vision_model` | `llava` | Vision model used for multimodal context extraction. |
+| `ollama_text_model` | `mistral` | Fallback text model used for summarization. |
+| `clipboard_capture_enabled` | `False` | Determines whether clipboard contents are stored. |
+| `capture_paused_on_startup` | `True` | Initializes the monitor in a suspended state. |
 
-## Data Location
+## Storage Architecture
 
-By default, data is stored in the user's Local App Data directory:
-`%LOCALAPPDATA%\OmniContext\`
+By default, all application data is stored securely within the user's Local App Data directory to ensure isolation from the source repository.
+
+**Path:** `%LOCALAPPDATA%\OmniContext\`
 
 ```text
 %LOCALAPPDATA%\OmniContext\
-  omnicontext.db      SQLite events, sessions, and FTS index
-  faiss.index         FAISS vector index
-  faiss_meta.json     FAISS row to event ID mapping
-  settings.json       Persistent application settings
-  screenshots/        WebP captures
+├── omnicontext.db      # SQLite database containing events, sessions, and the FTS index
+├── faiss.index         # FAISS vector index for semantic search
+├── faiss_meta.json     # Metadata mapping FAISS row indices to event IDs
+├── settings.json       # Persistent user configuration state
+└── screenshots/        # Directory containing compressed WebP captures
 ```
 
-## Architecture
+## System Architecture
+
+The application pipeline is designed for asynchronous, non-blocking execution:
 
 ```text
-Capture monitor
-  -> raw event in SQLite
-  -> pipeline queue
-  -> OCR + summarise + embed
-  -> SQLite + FAISS
-  -> hybrid retrieval
-  -> FastAPI routes mounted inside NiceGUI
-  -> NiceGUI UI on port 7071
+Activity Monitor (Producer)
+ └─> Raw event captured -> Stored in SQLite
+ └─> Enqueued in processing queue
+       │
+       v
+AI Pipeline Worker (Consumer)
+ └─> OCR Extraction (EasyOCR)
+ └─> Multimodal Summarization (Ollama)
+ └─> Vector Embedding Generation (SentenceTransformers)
+ └─> Update SQLite & Append to FAISS Index
+       │
+       v
+Retrieval Layer
+ └─> Hybrid Search (Keyword + Semantic)
+ └─> Served via FastAPI & NiceGUI UI (Port 7071)
 ```
 
-## Project Structure
+## Repository Structure
 
 ```text
 OmniContext/
-  pyproject.toml          Project metadata and dependencies
-  main.py                 Entry point
-  config.py               Static settings and defaults
-  scripts/                Batch scripts for running and testing
-  api/routes.py           FastAPI routes
-  capture/monitor.py      Window, clipboard, and activity watcher
-  capture/screenshot.py   WebP screenshot capture
-  capture/session.py      Session grouping
-  pipeline/ocr.py         EasyOCR wrapper
-  pipeline/summarizer.py  Ollama summariser
-  pipeline/embedder.py    sentence-transformers wrapper
-  pipeline/processor.py   Background AI pipeline worker
-  search/retrieval.py     Hybrid search
-  storage/database.py     SQLite + FTS5
-  storage/models.py       Pydantic models
-  storage/settings.py     Persistent settings manager
-  storage/vector_store.py FAISS wrapper
-  ui/app.py               NiceGUI frontend
-  ui/styles.css           Frontend stylesheet
-  tests/test_core.py      Smoke tests
+├── pyproject.toml          # Project configuration and dependency specifications
+├── main.py                 # Application entry point and service orchestrator
+├── config.py               # Static constants and default configuration values
+├── scripts/                # Utility scripts for execution, linting, and testing
+├── api/
+│   └── routes.py           # FastAPI controller definitions
+├── capture/
+│   ├── monitor.py          # Activity monitor for window and clipboard changes
+│   ├── screenshot.py       # WebP screen capture utilities
+│   └── session.py          # Temporal session grouping logic
+├── pipeline/
+│   ├── ocr.py              # Optical Character Recognition module
+│   ├── summarizer.py       # LLM summarization integration
+│   ├── embedder.py         # Embedding generation module
+│   └── processor.py        # Background worker for the AI pipeline
+├── search/
+│   └── retrieval.py        # Implementation of Hybrid Search and RRF
+├── storage/
+│   ├── database.py         # SQLite connection and FTS operations
+│   ├── models.py           # Pydantic data schemas
+│   ├── settings.py         # Persistent configuration manager
+│   └── vector_store.py     # FAISS index wrapper
+├── ui/
+│   ├── app.py              # NiceGUI frontend components
+│   └── styles.css          # Core stylesheet
+└── tests/
+    └── test_core.py        # Automated test suite
 ```
