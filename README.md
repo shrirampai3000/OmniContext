@@ -8,6 +8,7 @@ Operating entirely on your local machine, OmniContext captures context-aware sna
 
 ## Key Features
 
+- **Personal Navigation Engine:** Goes beyond simple archiving by extracting deep context (`cwd`, `repo`, `file_path`, `page_title`) using modular extractors. One-click deep links allow you to instantly "Return to Context" (e.g., Open in VS Code, Open Folder).
 - **Intelligent Activity Capture:** Automatically captures context based on active window changes, clipboard modifications, and periodic intervals tied to user activity.
 - **Strict Privacy Controls:** Supports exclusion lists for password managers, private browsing sessions, and custom process or window title fragments. Capture can be paused entirely or disabled for specific modalities like the clipboard.
 - **Local AI Pipeline:** Integrates seamlessly with EasyOCR for text extraction, Ollama for summarization, and SentenceTransformers for generating embeddings.
@@ -138,7 +139,7 @@ The application pipeline is designed for asynchronous, non-blocking execution:
 
 ```text
 Activity Monitor (Producer)
- └─> Raw event captured -> Stored in SQLite
+ └─> Raw event captured -> Context Extractors (cwd, repo, file, title) -> Stored in SQLite
  └─> Enqueued in processing queue
        │
        v
@@ -166,6 +167,7 @@ OmniContext/
 │   └── routes.py           # FastAPI controller definitions
 ├── capture/
 │   ├── monitor.py          # Activity monitor for window and clipboard changes
+│   ├── extractors.py       # Modular context extractors (VS Code, Browser, Terminal)
 │   ├── screenshot.py       # WebP screen capture utilities
 │   └── session.py          # Temporal session grouping logic
 ├── pipeline/
