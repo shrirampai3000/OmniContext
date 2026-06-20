@@ -1,0 +1,16 @@
+# Normalise all text files to LF in the repo
+* text=auto eol=lf
+
+# Force these to always be LF
+*.py text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Binaries — no line-ending conversion
+*.webp binary
+*.png binary
+*.jpg binary
+*.index binary
