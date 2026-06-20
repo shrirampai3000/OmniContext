@@ -14,6 +14,9 @@ from typing import List, Optional
 import httpx
 from nicegui import app as nicegui_app, ui
 
+def _safe_html(content="", **kwargs):
+    return ui.html(content, sanitize=False, **kwargs)
+
 from config import APP_NAME, HOTKEY, UI_PORT
 
 logger = logging.getLogger(__name__)
@@ -70,7 +73,7 @@ def build_ui():
             "font-size:12px;color:var(--text-muted);margin-bottom:32px;letter-spacing:0.1em;text-transform:uppercase;font-weight:600"
         )
 
-        status_html = ui.html("").style("margin-bottom:32px")
+        status_html = _safe_html("").style("margin-bottom:32px")
 
         nav_items = [
             ("brain", "psychology", "Brain"),
@@ -176,10 +179,9 @@ def build_search_tab(state: AppState):
             results_area.clear()
             with results_area:
                 if not results:
-                    ui.html('<div class="empty-state"><div style="font-size:48px">🔍</div>'
+                    _safe_html('<div class="empty-state"><div style="font-size:48px">🔍</div>'
                             '<div style="margin-top:16px;font-size:16px;font-weight:500">No memories found</div>'
-                            '<div style="margin-top:8px;font-size:13px">Try different keywords</div></div>',
-                            sanitize=False)
+                            '<div style="margin-top:8px;font-size:13px">Try different keywords</div></div>')
                     return
                 ui.label(f"{len(results)} results").style(
                     "font-size:12px;color:#7a829a;margin-bottom:16px"
@@ -208,7 +210,7 @@ def _render_result_card(ev: dict, score: float):
         # Thumbnail
         ev_id = ev.get("id", "")
         if ev.get("screenshot_path"):
-            ui.html(
+            _safe_html(
                 f'<img src="{escape(_screenshot_src(ev_id), quote=True)}" class="thumb" '
                 f'onerror="this.style.display=\'none\'">'
             )
@@ -219,7 +221,7 @@ def _render_result_card(ev: dict, score: float):
             title = ev.get("window_title", "")
             with ui.row().style("align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap"):
                 if app_name:
-                    ui.html(
+                    _safe_html(
                         f'<span class="oc-pill oc-pill-accent">{escape(app_name[:30])}</span>'
                     )
                 ui.label(title[:80]).style(
@@ -234,13 +236,13 @@ def _render_result_card(ev: dict, score: float):
             # Topics + time
             with ui.row().style("align-items:center;gap:8px;flex-wrap:wrap"):
                 for topic in (ev.get("topics") or [])[:4]:
-                    ui.html(f'<span class="oc-pill">{escape(str(topic))}</span>')
+                    _safe_html(f'<span class="oc-pill">{escape(str(topic))}</span>')
                 ts = _fmt_time(ev.get("timestamp", ""))
                 ui.label(ts).style("font-size:12px;color:rgba(255,255,255,0.4);margin-left:auto")
 
             # Score bar
             bar_w = min(100, int(score * 500))
-            ui.html(
+            _safe_html(
                 f'<div class="score-bar" style="width:{bar_w}%;margin-top:8px"></div>'
             )
 
@@ -261,7 +263,7 @@ def build_timeline_tab(state: AppState):
             container.clear()
             with container:
                 if not events:
-                    ui.html('<div class="empty-state"><div style="font-size:48px">📋</div>'
+                    _safe_html('<div class="empty-state"><div style="font-size:48px">📋</div>'
                             '<div style="margin-top:16px">No captures yet</div></div>')
                     return
                 prev_day = None
@@ -303,7 +305,7 @@ def build_sessions_tab(state: AppState):
             container.clear()
             with container:
                 if not sessions:
-                    ui.html('<div class="empty-state" style="grid-column:1/-1">'
+                    _safe_html('<div class="empty-state" style="grid-column:1/-1">'
                             '<div style="font-size:48px">📂</div>'
                             '<div style="margin-top:16px">No sessions yet</div></div>')
                     return
@@ -472,7 +474,7 @@ def _render_cluster_card(cluster: dict, accent: str, glow: str, on_click):
                 f"font-size:15px;font-weight:700;color:var(--text-main);"
                 f"overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px"
             )
-            ui.html(
+            _safe_html(
                 f'<span style="background:{glow};border:1px solid {accent};color:{accent};'
                 f'border-radius:20px;padding:2px 10px;font-size:11px;font-weight:600">'
                 f'{count} captures</span>'
@@ -486,13 +488,13 @@ def _render_cluster_card(cluster: dict, accent: str, glow: str, on_click):
         if co_entities:
             with ui.row().style("gap:6px;flex-wrap:wrap"):
                 for co in co_entities[:4]:
-                    ui.html(
+                    _safe_html(
                         f'<span class="oc-pill">'
                         f'{co[:20]}</span>'
                     )
 
         # Accent bar
-        ui.html(f'<div style="height:2px;border-radius:2px;background:{accent};margin-top:10px;opacity:.6"></div>')
+        _safe_html(f'<div style="height:2px;border-radius:2px;background:{accent};margin-top:10px;opacity:.6"></div>')
 
 
 def build_brain_tab(state: AppState):
@@ -539,7 +541,7 @@ def build_brain_tab(state: AppState):
                 ui.separator().style("margin-bottom:16px;border-color:#2a3045")
 
                 if not events:
-                    ui.html('<div class="empty-state"><div style="font-size:32px">🔍</div>'
+                    _safe_html('<div class="empty-state"><div style="font-size:32px">🔍</div>'
                             '<div style="margin-top:12px">No memories yet for this topic</div></div>')
                     return
 
@@ -567,7 +569,7 @@ def build_brain_tab(state: AppState):
 
                 any_data = any(clusters for _, clusters in windows)
                 if not any_data:
-                    ui.html(
+                    _safe_html(
                         '<div class="empty-state">'
                         '<div style="font-size:48px">🧠</div>'
                         '<div style="margin-top:16px;font-size:16px;font-weight:500">Brain is empty</div>'
@@ -583,7 +585,7 @@ def build_brain_tab(state: AppState):
                         cfg = _WINDOW_COLORS[window_key]
                         with ui.element("div").style("flex:1;min-width:240px"):
                             # Window header
-                            ui.html(
+                            _safe_html(
                                 f'<div style="font-size:11px;font-weight:700;text-transform:uppercase;'
                                 f'letter-spacing:.08em;color:{cfg["accent"]};margin-bottom:14px;'
                                 f'display:flex;align-items:center;gap:8px">'
@@ -622,8 +624,8 @@ def run_ui():
         port=UI_PORT,
         title="OmniContext",
         favicon="🧠",
-        dark=True,
+        dark=False,
         reload=False,
-        show=True,
+        show=False,
         show_welcome_message=False,
     )
