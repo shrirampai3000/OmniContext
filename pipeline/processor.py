@@ -111,6 +111,13 @@ class PipelineWorker:
             if faiss_row >= 0:
                 store.save()
 
+            # ── Step 6: Build graph links ─────────────────────────────────────
+            event.entities = entities
+            event.topics = topics
+            event.summary = summary
+            from graph.linker import link_event
+            link_event(event)
+
             logger.debug(
                 "Event %s processed: summary=%r topics=%s",
                 event.id[:8],

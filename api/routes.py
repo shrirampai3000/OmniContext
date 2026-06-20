@@ -194,3 +194,27 @@ def patch_settings(body: SettingsPatch):
     if body.screenshot_quality is not None:
         cfg.SCREENSHOT_QUALITY = max(1, min(100, body.screenshot_quality))
     return {"updated": True}
+
+
+# ── Digital Brain / Graph ─────────────────────────────────────────────────────
+
+@router.get("/brain", tags=["graph"])
+def get_brain():
+    """Digital Brain home view — time-windowed topic clusters."""
+    from graph.clusterer import get_brain_view
+    return get_brain_view()
+
+
+@router.get("/brain/cluster/{entity_name}", tags=["graph"])
+def get_cluster(entity_name: str):
+    """Drill-down for a single topic cluster / entity hub."""
+    from graph.clusterer import get_cluster_detail
+    return get_cluster_detail(entity_name)
+
+
+@router.get("/entities", tags=["graph"])
+def list_entities_graph(limit: int = Query(30, ge=1, le=100)):
+    """Top entities by total mention count."""
+    from storage.database import get_top_entities
+    return get_top_entities(limit=limit)
+

@@ -229,6 +229,7 @@ def build_ui():
         status_html = ui.html("", sanitize=False).style("margin-bottom:24px")
 
         nav_items = [
+            ("brain", "🧠  Brain"),
             ("search", "🔍  Search"),
             ("timeline", "📋  Timeline"),
             ("sessions", "📂  Sessions"),
@@ -280,7 +281,9 @@ def build_ui():
             )
         main_area.clear()
         with main_area:
-            if tab_id == "search":
+            if tab_id == "brain":
+                build_brain_tab(state)
+            elif tab_id == "search":
                 build_search_tab(state)
             elif tab_id == "timeline":
                 build_timeline_tab(state)
@@ -294,8 +297,8 @@ def build_ui():
 
     # Initial render
     with main_area:
-        build_search_tab(state)
-    switch_tab("search")
+        build_brain_tab(state)
+    switch_tab("brain")
 
     # Status timer
     ui.timer(5.0, refresh_status)
@@ -589,6 +592,176 @@ def build_settings_tab(state: AppState):
 
 
 # ── Entry point ───────────────────────────────────────────────────────────
+
+
+# ── Brain tab ─────────────────────────────────────────────────────────────────
+
+_WINDOW_COLORS = {
+    "today":      {"accent": "#6366f1", "glow": "rgba(99,102,241,.18)", "label": "Today"},
+    "this_week":  {"accent": "#22c55e", "glow": "rgba(34,197,94,.15)",  "label": "This Week"},
+    "this_month": {"accent": "#f59e0b", "glow": "rgba(245,158,11,.15)", "label": "This Month"},
+}
+
+
+def _render_cluster_card(cluster: dict, accent: str, glow: str, on_click):
+    name        = cluster.get("name", "")
+    count       = cluster.get("event_count", 0)
+    app         = cluster.get("dominant_app", "")
+    co_entities = cluster.get("co_entities", [])
+
+    with ui.element("div").style(
+        f"background:#161a23;border:1px solid {accent};border-radius:12px;"
+        f"padding:16px;cursor:pointer;transition:all .2s;"
+        f"box-shadow:0 0 0 0 {glow};"
+    ).on("click", on_click).on(
+        "mouseenter", lambda e: None
+    ):
+        # Top row: name + count badge
+        with ui.row().style("align-items:center;justify-content:space-between;margin-bottom:10px"):
+            ui.label(name[:32]).style(
+                f"font-size:15px;font-weight:600;color:#e8eaf0;"
+                f"overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px"
+            )
+            ui.html(
+                f'<span style="background:{glow};border:1px solid {accent};color:{accent};'
+                f'border-radius:20px;padding:2px 10px;font-size:11px;font-weight:600">'
+                f'{count} captures</span>'
+            )
+
+        # Dominant app
+        if app:
+            ui.label(app[:30]).style("font-size:11px;color:#7a829a;margin-bottom:8px")
+
+        # Co-entity pills
+        if co_entities:
+            with ui.row().style("gap:6px;flex-wrap:wrap"):
+                for co in co_entities[:4]:
+                    ui.html(
+                        f'<span style="background:#1e2330;border:1px solid #2a3045;'
+                        f'border-radius:16px;padding:2px 8px;font-size:10px;color:#9ca3af">'
+                        f'{co[:20]}</span>'
+                    )
+
+        # Accent bar
+        ui.html(f'<div style="height:2px;border-radius:2px;background:{accent};margin-top:10px;opacity:.6"></div>')
+
+
+def build_brain_tab(state: AppState):
+    detail_container = None
+
+    # ── Header ────────────────────────────────────────────────────────────
+    with ui.row().style("align-items:center;justify-content:space-between;margin-bottom:4px"):
+        ui.label("Your Digital Brain").style("font-size:28px;font-weight:700")
+
+    ui.label("Your activity, auto-clustered by topic").style(
+        "font-size:14px;color:#7a829a;margin-bottom:28px"
+    )
+
+    clusters_area = ui.element("div")
+    detail_area   = ui.element("div").style("margin-top:32px;max-width:1000px")
+
+    async def show_cluster_detail(entity_name: str):
+        detail_area.clear()
+        with detail_area:
+            ui.label(f"Loading '{entity_name}'…").style("color:#7a829a;font-size:13px")
+        try:
+            data = await _api("get", f"/brain/cluster/{entity_name}")
+            detail_area.clear()
+            with detail_area:
+                events = data.get("events", [])
+                co     = data.get("co_entities", [])
+
+                with ui.row().style("align-items:center;gap:12px;margin-bottom:16px"):
+                    ui.label(f"📌 {entity_name}").style("font-size:20px;font-weight:700")
+                    ui.label(f"{len(events)} captures").style(
+                        "font-size:12px;color:#7a829a;background:#1e2330;"
+                        "border-radius:20px;padding:3px 12px;border:1px solid #2a3045"
+                    )
+
+                if co:
+                    with ui.row().style("gap:8px;margin-bottom:20px;flex-wrap:wrap"):
+                        ui.label("Related:").style("font-size:12px;color:#7a829a;align-self:center")
+                        for c in co:
+                            ui.button(c[:24]).props("flat").style(
+                                "font-size:11px;color:#6366f1;border:1px solid rgba(99,102,241,.3);"
+                                "border-radius:20px;padding:2px 12px;height:auto"
+                            ).on("click", lambda n=c: show_cluster_detail(n))
+
+                ui.separator().style("margin-bottom:16px;border-color:#2a3045")
+
+                if not events:
+                    ui.html('<div class="empty-state"><div style="font-size:32px">🔍</div>'
+                            '<div style="margin-top:12px">No memories yet for this topic</div></div>')
+                    return
+
+                for ev in events[:20]:
+                    _render_result_card(ev, 0)
+
+        except Exception as exc:
+            detail_area.clear()
+            with detail_area:
+                ui.label(f"Failed: {exc}").style("color:#ef4444;font-size:13px")
+
+    async def load_brain():
+        clusters_area.clear()
+        with clusters_area:
+            ui.label("Loading your brain…").style("color:#7a829a;font-size:13px")
+        try:
+            data = await _api("get", "/brain")
+            clusters_area.clear()
+            with clusters_area:
+                windows = [
+                    ("today",      data.get("today",      [])),
+                    ("this_week",  data.get("this_week",  [])),
+                    ("this_month", data.get("this_month", [])),
+                ]
+
+                any_data = any(clusters for _, clusters in windows)
+                if not any_data:
+                    ui.html(
+                        '<div class="empty-state">'
+                        '<div style="font-size:48px">🧠</div>'
+                        '<div style="margin-top:16px;font-size:16px;font-weight:500">Brain is empty</div>'
+                        '<div style="margin-top:8px;font-size:13px;color:#7a829a">'
+                        'Memories will appear here as OmniContext captures your activity.'
+                        '</div></div>'
+                    )
+                    return
+
+                # Three-column layout for time windows
+                with ui.row().style("gap:24px;align-items:flex-start;flex-wrap:wrap"):
+                    for window_key, clusters in windows:
+                        cfg = _WINDOW_COLORS[window_key]
+                        with ui.element("div").style("flex:1;min-width:240px"):
+                            # Window header
+                            ui.html(
+                                f'<div style="font-size:11px;font-weight:700;text-transform:uppercase;'
+                                f'letter-spacing:.08em;color:{cfg["accent"]};margin-bottom:14px;'
+                                f'display:flex;align-items:center;gap:8px">'
+                                f'<span style="width:8px;height:8px;border-radius:50%;'
+                                f'background:{cfg["accent"]};display:inline-block"></span>'
+                                f'{cfg["label"]}'
+                                f'</div>'
+                            )
+                            if not clusters:
+                                ui.label("No activity yet").style("font-size:12px;color:#4b5563")
+                            else:
+                                for cluster in clusters:
+                                    _render_cluster_card(
+                                        cluster,
+                                        accent=cfg["accent"],
+                                        glow=cfg["glow"],
+                                        on_click=lambda n=cluster["name"]: show_cluster_detail(n),
+                                    )
+                                    ui.element("div").style("height:10px")
+
+        except Exception as exc:
+            clusters_area.clear()
+            with clusters_area:
+                ui.label(f"Failed to load brain: {exc}").style("color:#ef4444;font-size:13px")
+
+    ui.timer(0.1, load_brain, once=True)
+
 
 def run_ui():
     @ui.page("/")

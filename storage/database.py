@@ -97,6 +97,35 @@ SELECT rowid, id, window_title, ocr_text, summary, entities, topics
 FROM events;
 """
 
+_CREATE_ENTITIES = """
+CREATE TABLE IF NOT EXISTS entities (
+    name          TEXT PRIMARY KEY,
+    mention_count INTEGER DEFAULT 1,
+    first_seen    TEXT NOT NULL,
+    last_seen     TEXT NOT NULL
+);
+"""
+
+_CREATE_MEMORY_LINKS = """
+CREATE TABLE IF NOT EXISTS memory_links (
+    id          TEXT PRIMARY KEY,
+    source_id   TEXT NOT NULL,
+    target_id   TEXT NOT NULL,
+    target_type TEXT NOT NULL,
+    link_type   TEXT NOT NULL,
+    weight      REAL DEFAULT 1.0,
+    created_at  TEXT NOT NULL,
+    FOREIGN KEY (source_id) REFERENCES events(id)
+);
+"""
+
+_CREATE_MEMORY_LINKS_INDEXES = """
+CREATE INDEX IF NOT EXISTS idx_links_source ON memory_links(source_id);
+CREATE INDEX IF NOT EXISTS idx_links_target ON memory_links(target_id);
+CREATE INDEX IF NOT EXISTS idx_links_type   ON memory_links(link_type);
+CREATE INDEX IF NOT EXISTS idx_entities_count ON entities(mention_count DESC);
+"""
+
 
 # ── Connection helper ────────────────────────────────────────────────────────
 
@@ -145,7 +174,18 @@ def init_db() -> None:
                     conn.execute(stmt)
                 except sqlite3.OperationalError:
                     pass  # Trigger already exists
+            # Graph tables
+            conn.execute(_CREATE_ENTITIES)
+            conn.execute(_CREATE_MEMORY_LINKS)
+            for stmt in _CREATE_MEMORY_LINKS_INDEXES.strip().splitlines():
+                stmt = stmt.strip()
+                if stmt:
+                    try:
+                        conn.execute(stmt)
+                    except sqlite3.OperationalError:
+                        pass
     logger.info("Database initialised at %s", DB_PATH)
+
 
 
 # ── Event helpers ────────────────────────────────────────────────────────────
@@ -380,3 +420,104 @@ def close_db() -> None:
             _conn.close()
             _conn = None
     logger.info("Database connection closed.")
+
+
+# ── Graph / entity helpers ────────────────────────────────────────────────────
+
+def upsert_entity(name: str, when: str) -> None:
+    """Insert a new entity or increment its mention count."""
+    with _db_lock:
+        conn = get_db()
+        with conn:
+            conn.execute(
+                """
+                INSERT INTO entities (name, mention_count, first_seen, last_seen)
+                VALUES (?, 1, ?, ?)
+                ON CONFLICT(name) DO UPDATE SET
+                    mention_count = mention_count + 1,
+                    last_seen = excluded.last_seen
+                """,
+                (name, when, when),
+            )
+
+
+def insert_link(
+    source_id: str,
+    target_id: str,
+    target_type: str,
+    link_type: str,
+    weight: float = 1.0,
+) -> None:
+    with _db_lock:
+        conn = get_db()
+        with conn:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO memory_links
+                (id, source_id, target_id, target_type, link_type, weight, created_at)
+                VALUES (?,?,?,?,?,?,?)
+                """,
+                (
+                    f"{source_id}:{target_id}:{link_type}",
+                    source_id,
+                    target_id,
+                    target_type,
+                    link_type,
+                    weight,
+                    datetime.utcnow().isoformat(),
+                ),
+            )
+
+
+def get_top_entities(limit: int = 30) -> List[dict]:
+    with _db_lock:
+        conn = get_db()
+        rows = conn.execute(
+            "SELECT name, mention_count, first_seen, last_seen FROM entities ORDER BY mention_count DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_entity_event_ids(entity_name: str, limit: int = 50) -> List[str]:
+    """Return event IDs whose entities list contains entity_name (case-insensitive)."""
+    with _db_lock:
+        conn = get_db()
+        pattern = f'%"{entity_name}"%'
+        rows = conn.execute(
+            "SELECT id FROM events WHERE entities LIKE ? ORDER BY timestamp DESC LIMIT ?",
+            (pattern, limit),
+        ).fetchall()
+    return [r["id"] for r in rows]
+
+
+def get_events_since(cutoff_iso: str, limit: int = 2000) -> List[Event]:
+    with _db_lock:
+        conn = get_db()
+        rows = conn.execute(
+            "SELECT * FROM events WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT ?",
+            (cutoff_iso, limit),
+        ).fetchall()
+    return [_row_to_event(r) for r in rows]
+
+
+def get_co_entities(entity_name: str, top_k: int = 8) -> List[str]:
+    """Return entities that most often co-occur with entity_name."""
+    event_ids = get_entity_event_ids(entity_name, limit=200)
+    if not event_ids:
+        return []
+    with _db_lock:
+        conn = get_db()
+        placeholders = ",".join("?" * len(event_ids))
+        rows = conn.execute(
+            f"SELECT entities FROM events WHERE id IN ({placeholders})",
+            event_ids,
+        ).fetchall()
+    from collections import Counter
+    counts: Counter = Counter()
+    for row in rows:
+        for ent in json.loads(row["entities"] or "[]"):
+            if ent != entity_name:
+                counts[ent] += 1
+    return [e for e, _ in counts.most_common(top_k)]
+
