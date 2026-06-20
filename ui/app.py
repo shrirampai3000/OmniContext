@@ -221,32 +221,48 @@ def _open_event_modal(ev: dict):
         file_path = ev.get("file_path", "")
         cwd = ev.get("cwd", "")
         url = ev.get("url", "")
+        app_name = ev.get("app_name", "")
+        repo = ev.get("repo", "")
+        page_title = ev.get("page_title", "")
         
-        with ui.row().style("gap:12px;margin-bottom:24px;background:var(--bg-base);padding:12px;border-radius:12px;align-items:center"):
-            ui.label("Actions:").style("font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase")
+        # Context Overview
+        with ui.column().style("gap:8px;margin-bottom:16px;background:var(--bg-base);padding:16px;border-radius:12px;border:1px solid var(--border)"):
+            ui.label("Context Overview").style("font-size:14px;font-weight:700;color:var(--accent);margin-bottom:8px;text-transform:uppercase")
+            if repo: ui.html(f'<span style="color:var(--text-muted);font-weight:600;min-width:80px;display:inline-block">Repo:</span> {escape(repo)}')
+            if file_path: ui.html(f'<span style="color:var(--text-muted);font-weight:600;min-width:80px;display:inline-block">File:</span> {escape(file_path)}')
+            if cwd: ui.html(f'<span style="color:var(--text-muted);font-weight:600;min-width:80px;display:inline-block">Folder:</span> {escape(cwd)}')
+            if page_title: ui.html(f'<span style="color:var(--text-muted);font-weight:600;min-width:80px;display:inline-block">Page:</span> {escape(page_title)}')
+            ui.html(f'<span style="color:var(--text-muted);font-weight:600;min-width:80px;display:inline-block">App:</span> {escape(app_name)}')
+
+        with ui.row().style("gap:12px;margin-bottom:24px;align-items:center"):
             if file_path:
                 ui.link("Open File", f"vscode://file/{file_path}").style(
-                    "background:var(--accent);color:#fff;padding:6px 12px;border-radius:8px;font-size:13px;text-decoration:none;font-weight:600"
+                    "background:var(--accent);color:#fff;padding:6px 16px;border-radius:8px;font-size:13px;text-decoration:none;font-weight:600"
                 )
             if cwd:
                 def _open_folder():
                     try: os.startfile(cwd)
                     except: pass
                 ui.button("Open Folder", on_click=_open_folder).style(
-                    "background:var(--bg-surface);color:var(--text-main);padding:6px 12px;border-radius:8px;font-size:13px;font-weight:600;border:1px solid var(--border)"
+                    "background:var(--bg-surface);color:var(--text-main);padding:6px 16px;border-radius:8px;font-size:13px;font-weight:600;border:1px solid var(--border)"
                 ).props('flat')
             if url:
                 ui.link("Open URL", url, new_tab=True).style(
-                    "background:var(--bg-surface);color:var(--text-main);padding:6px 12px;border-radius:8px;font-size:13px;text-decoration:none;font-weight:600;border:1px solid var(--border)"
+                    "background:var(--bg-surface);color:var(--text-main);padding:6px 16px;border-radius:8px;font-size:13px;text-decoration:none;font-weight:600;border:1px solid var(--border)"
                 )
+            if file_path or cwd:
+                def _copy_path():
+                    ui.clipboard.write(file_path or cwd)
+                    ui.notify("Path copied!")
+                ui.button("Copy Path", on_click=_copy_path).style(
+                    "background:var(--bg-surface);color:var(--text-main);padding:6px 16px;border-radius:8px;font-size:13px;font-weight:600;border:1px solid var(--border)"
+                ).props('flat')
+            
             if not file_path and not cwd and not url:
                 ui.label("No actionable links for this event.").style("font-size:13px;color:var(--text-muted)")
 
         # Details
         with ui.column().style("gap:8px"):
-            ui.html(f'<b>Application:</b> {escape(ev.get("app_name", ""))}')
-            ui.html(f'<b>Window:</b> {escape(ev.get("window_title", ""))}')
-            if ev.get("repo"): ui.html(f'<b>Repository:</b> {escape(ev.get("repo", ""))}')
             if ev.get("summary"): ui.html(f'<b>Summary:</b> {escape(ev.get("summary", ""))}')
             if ev.get("ocr_text"): 
                 with ui.expansion("OCR Text").style("width:100%"):

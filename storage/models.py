@@ -42,6 +42,9 @@ class Event(BaseModel):
     url: str = ""
     repo: str = ""
     cwd: str = ""
+    context_type: str = "unknown"
+    context_confidence: float = 0.0
+    page_title: str = ""
     processed: bool = False       # True once AI pipeline has run
 
 

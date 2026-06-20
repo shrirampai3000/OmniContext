@@ -21,6 +21,7 @@ try:
 except ImportError:
     _WIN32_AVAILABLE = False
 
+from capture.extractors import get_extractor
 from capture.screenshot import capture_screenshot
 from capture.session import SessionTracker
 from storage.database import insert_event
@@ -33,35 +34,23 @@ logger = logging.getLogger(__name__)
 import os
 
 def _get_active_context() -> dict:
-    """Returns dict of context: title, app, cwd, repo, file, url"""
-    ctx = {"title": "", "app": "", "cwd": "", "repo": "", "file": "", "url": ""}
+    """Returns dict of context using modular extractors."""
+    ctx = {"title": "", "app": "", "cwd": "", "repo": "", "file": "", "url": "", "context_type": "unknown", "context_confidence": 0.0, "page_title": ""}
     if not _WIN32_AVAILABLE:
         return ctx
     try:
         hwnd = win32gui.GetForegroundWindow()
-        ctx["title"] = win32gui.GetWindowText(hwnd) or ""
+        title = win32gui.GetWindowText(hwnd) or ""
         _, pid = win32process.GetWindowThreadProcessId(hwnd)
         proc = psutil.Process(pid)
-        ctx["app"] = proc.name()
+        app = proc.name()
         
-        try:
-            cwd = proc.cwd()
-            if cwd:
-                ctx["cwd"] = cwd
-                ctx["repo"] = os.path.basename(cwd)
-        except Exception:
-            pass
-
-        # Heuristics based on app
-        if "Code.exe" in ctx["app"]:
-            parts = ctx["title"].split(" - ")
-            if len(parts) >= 2:
-                filename = parts[0].strip()
-                # Best-effort file path
-                if ctx["cwd"]:
-                    ctx["file"] = os.path.join(ctx["cwd"], filename)
-                else:
-                    ctx["file"] = filename
+        ctx["title"] = title
+        ctx["app"] = app
+        
+        extractor = get_extractor(app)
+        extracted = extractor.extract(title, app, pid)
+        ctx.update(extracted)
         
         return ctx
     except Exception:
@@ -222,6 +211,9 @@ class ActivityMonitor:
             repo=ctx.get("repo", ""),
             file_path=ctx.get("file", ""),
             url=ctx.get("url", ""),
+            context_type=ctx.get("context_type", "unknown"),
+            context_confidence=ctx.get("context_confidence", 0.0),
+            page_title=ctx.get("page_title", ""),
         )
 
         # Assign session

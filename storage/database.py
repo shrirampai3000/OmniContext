@@ -52,6 +52,9 @@ CREATE TABLE IF NOT EXISTS events (
     url             TEXT DEFAULT '',
     repo            TEXT DEFAULT '',
     cwd             TEXT DEFAULT '',
+    context_type    TEXT DEFAULT 'unknown',
+    context_confidence REAL DEFAULT 0.0,
+    page_title      TEXT DEFAULT '',
     processed       INTEGER DEFAULT 0,
     FOREIGN KEY (session_id) REFERENCES sessions(id)
 );
@@ -166,9 +169,10 @@ def init_db() -> None:
             conn.execute(_CREATE_EVENTS)
             
             # Migrations for new columns
-            for col in ["file_path", "url", "repo", "cwd"]:
+            for col, dtype in [("file_path", "TEXT"), ("url", "TEXT"), ("repo", "TEXT"), ("cwd", "TEXT"), 
+                               ("context_type", "TEXT"), ("context_confidence", "REAL"), ("page_title", "TEXT")]:
                 try:
-                    conn.execute(f"ALTER TABLE events ADD COLUMN {col} TEXT DEFAULT ''")
+                    conn.execute(f"ALTER TABLE events ADD COLUMN {col} {dtype} DEFAULT ''")
                 except sqlite3.OperationalError:
                     pass  # column already exists
 
@@ -214,6 +218,9 @@ def _row_to_event(row: sqlite3.Row) -> Event:
     d["url"] = d.get("url") or ""
     d["repo"] = d.get("repo") or ""
     d["cwd"] = d.get("cwd") or ""
+    d["context_type"] = d.get("context_type") or "unknown"
+    d["context_confidence"] = float(d.get("context_confidence") or 0.0)
+    d["page_title"] = d.get("page_title") or ""
     return Event(**d)
 
 
@@ -226,8 +233,9 @@ def insert_event(event: Event) -> None:
                 INSERT INTO events
                 (id, timestamp, app_name, window_title, clipboard_text,
                  screenshot_path, ocr_text, summary, entities, topics,
-                 session_id, embedding_id, file_path, url, repo, cwd, processed)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 session_id, embedding_id, file_path, url, repo, cwd, 
+                 context_type, context_confidence, page_title, processed)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     event.id,
@@ -246,6 +254,9 @@ def insert_event(event: Event) -> None:
                     event.url,
                     event.repo,
                     event.cwd,
+                    event.context_type,
+                    event.context_confidence,
+                    event.page_title,
                     int(event.processed),
                 ),
             )
