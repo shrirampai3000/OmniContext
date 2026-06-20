@@ -48,6 +48,10 @@ CREATE TABLE IF NOT EXISTS events (
     topics          TEXT DEFAULT '[]',
     session_id      TEXT DEFAULT NULL,
     embedding_id    TEXT DEFAULT '',
+    file_path       TEXT DEFAULT '',
+    url             TEXT DEFAULT '',
+    repo            TEXT DEFAULT '',
+    cwd             TEXT DEFAULT '',
     processed       INTEGER DEFAULT 0,
     FOREIGN KEY (session_id) REFERENCES sessions(id)
 );
@@ -160,6 +164,14 @@ def init_db() -> None:
         with conn:
             conn.execute(_CREATE_SESSIONS)
             conn.execute(_CREATE_EVENTS)
+            
+            # Migrations for new columns
+            for col in ["file_path", "url", "repo", "cwd"]:
+                try:
+                    conn.execute(f"ALTER TABLE events ADD COLUMN {col} TEXT DEFAULT ''")
+                except sqlite3.OperationalError:
+                    pass  # column already exists
+
             conn.execute(_CREATE_EVENTS_INDEX)
             conn.executescript(_DROP_FTS_TRIGGERS)
             conn.execute("DROP TABLE IF EXISTS events_fts")
@@ -198,6 +210,10 @@ def _row_to_event(row: sqlite3.Row) -> Event:
     d["processed"] = bool(d.get("processed", 0))
     d["session_id"] = d.get("session_id") or ""
     d["embedding_id"] = d.get("embedding_id") or ""
+    d["file_path"] = d.get("file_path") or ""
+    d["url"] = d.get("url") or ""
+    d["repo"] = d.get("repo") or ""
+    d["cwd"] = d.get("cwd") or ""
     return Event(**d)
 
 
@@ -210,8 +226,8 @@ def insert_event(event: Event) -> None:
                 INSERT INTO events
                 (id, timestamp, app_name, window_title, clipboard_text,
                  screenshot_path, ocr_text, summary, entities, topics,
-                 session_id, embedding_id, processed)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 session_id, embedding_id, file_path, url, repo, cwd, processed)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     event.id,
@@ -226,6 +242,10 @@ def insert_event(event: Event) -> None:
                     json.dumps(event.topics),
                     event.session_id or None,
                     event.embedding_id,
+                    event.file_path,
+                    event.url,
+                    event.repo,
+                    event.cwd,
                     int(event.processed),
                 ),
             )

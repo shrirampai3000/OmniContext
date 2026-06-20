@@ -205,8 +205,60 @@ def build_search_tab(state: AppState):
             ).on("click", lambda s=suggestion: (search_input.set_value(s), do_search()))
 
 
+import subprocess
+import os
+
+def _open_event_modal(ev: dict):
+    with ui.dialog() as dialog, ui.element("div").classes("modal-box"):
+        ui.label("Memory Details").style("font-size:24px;font-weight:800;margin-bottom:20px")
+        
+        # Image
+        ev_id = ev.get("id", "")
+        if ev.get("screenshot_path"):
+            _safe_html(f'<img src="{escape(_screenshot_src(ev_id), quote=True)}" style="width:100%;border-radius:12px;margin-bottom:24px;border:1px solid var(--border)">')
+
+        # Action Bar (Deep Links)
+        file_path = ev.get("file_path", "")
+        cwd = ev.get("cwd", "")
+        url = ev.get("url", "")
+        
+        with ui.row().style("gap:12px;margin-bottom:24px;background:var(--bg-base);padding:12px;border-radius:12px;align-items:center"):
+            ui.label("Actions:").style("font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase")
+            if file_path:
+                ui.link("Open File", f"vscode://file/{file_path}").style(
+                    "background:var(--accent);color:#fff;padding:6px 12px;border-radius:8px;font-size:13px;text-decoration:none;font-weight:600"
+                )
+            if cwd:
+                def _open_folder():
+                    try: os.startfile(cwd)
+                    except: pass
+                ui.button("Open Folder", on_click=_open_folder).style(
+                    "background:var(--bg-surface);color:var(--text-main);padding:6px 12px;border-radius:8px;font-size:13px;font-weight:600;border:1px solid var(--border)"
+                ).props('flat')
+            if url:
+                ui.link("Open URL", url, new_tab=True).style(
+                    "background:var(--bg-surface);color:var(--text-main);padding:6px 12px;border-radius:8px;font-size:13px;text-decoration:none;font-weight:600;border:1px solid var(--border)"
+                )
+            if not file_path and not cwd and not url:
+                ui.label("No actionable links for this event.").style("font-size:13px;color:var(--text-muted)")
+
+        # Details
+        with ui.column().style("gap:8px"):
+            ui.html(f'<b>Application:</b> {escape(ev.get("app_name", ""))}')
+            ui.html(f'<b>Window:</b> {escape(ev.get("window_title", ""))}')
+            if ev.get("repo"): ui.html(f'<b>Repository:</b> {escape(ev.get("repo", ""))}')
+            if ev.get("summary"): ui.html(f'<b>Summary:</b> {escape(ev.get("summary", ""))}')
+            if ev.get("ocr_text"): 
+                with ui.expansion("OCR Text").style("width:100%"):
+                    ui.label(ev.get("ocr_text", "")).style("white-space:pre-wrap;font-size:12px;color:var(--text-muted);font-family:monospace")
+            if ev.get("clipboard_text"):
+                with ui.expansion("Clipboard").style("width:100%"):
+                    ui.label(ev.get("clipboard_text", "")).style("white-space:pre-wrap;font-size:12px;color:var(--text-muted);font-family:monospace")
+
+    dialog.open()
+
 def _render_result_card(ev: dict, score: float):
-    with ui.element("div").classes("oc-card").style("margin-bottom:12px;display:flex;gap:16px;align-items:flex-start"):
+    with ui.element("div").classes("oc-card").style("margin-bottom:12px;display:flex;gap:16px;align-items:flex-start").on("click", lambda: _open_event_modal(ev)):
         # Thumbnail
         ev_id = ev.get("id", "")
         if ev.get("screenshot_path"):
@@ -216,14 +268,15 @@ def _render_result_card(ev: dict, score: float):
             )
 
         with ui.element("div").style("flex:1;min-width:0"):
-            # App + title
+            # App + title + repo
             app_name = ev.get("app_name", "")
             title = ev.get("window_title", "")
+            repo = ev.get("repo", "")
             with ui.row().style("align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap"):
                 if app_name:
-                    _safe_html(
-                        f'<span class="oc-pill oc-pill-accent">{escape(app_name[:30])}</span>'
-                    )
+                    _safe_html(f'<span class="oc-pill oc-pill-accent">{escape(app_name[:30])}</span>')
+                if repo:
+                    _safe_html(f'<span class="oc-pill" style="background:var(--success);color:#fff">{escape(repo[:30])}</span>')
                 ui.label(title[:80]).style(
                     "font-size:15px;font-weight:600;color:var(--text-main);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
                 )
@@ -238,13 +291,12 @@ def _render_result_card(ev: dict, score: float):
                 for topic in (ev.get("topics") or [])[:4]:
                     _safe_html(f'<span class="oc-pill">{escape(str(topic))}</span>')
                 ts = _fmt_time(ev.get("timestamp", ""))
-                ui.label(ts).style("font-size:12px;color:rgba(255,255,255,0.4);margin-left:auto")
+                ui.label(ts).style("font-size:12px;color:var(--text-muted);margin-left:auto;font-weight:500")
 
             # Score bar
             bar_w = min(100, int(score * 500))
-            _safe_html(
-                f'<div class="score-bar" style="width:{bar_w}%;margin-top:8px"></div>'
-            )
+            if score > 0:
+                _safe_html(f'<div class="score-bar" style="width:{bar_w}%;margin-top:8px"></div>')
 
 
 # ── Timeline tab ──────────────────────────────────────────────────────────

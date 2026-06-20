@@ -30,18 +30,42 @@ from storage.settings import get_settings
 logger = logging.getLogger(__name__)
 
 
-def _get_active_window() -> tuple[str, str]:
-    """Returns (window_title, process_name). Falls back to empty strings."""
+import os
+
+def _get_active_context() -> dict:
+    """Returns dict of context: title, app, cwd, repo, file, url"""
+    ctx = {"title": "", "app": "", "cwd": "", "repo": "", "file": "", "url": ""}
     if not _WIN32_AVAILABLE:
-        return "", ""
+        return ctx
     try:
         hwnd = win32gui.GetForegroundWindow()
-        title = win32gui.GetWindowText(hwnd) or ""
+        ctx["title"] = win32gui.GetWindowText(hwnd) or ""
         _, pid = win32process.GetWindowThreadProcessId(hwnd)
         proc = psutil.Process(pid)
-        return title, proc.name()
+        ctx["app"] = proc.name()
+        
+        try:
+            cwd = proc.cwd()
+            if cwd:
+                ctx["cwd"] = cwd
+                ctx["repo"] = os.path.basename(cwd)
+        except Exception:
+            pass
+
+        # Heuristics based on app
+        if "Code.exe" in ctx["app"]:
+            parts = ctx["title"].split(" - ")
+            if len(parts) >= 2:
+                filename = parts[0].strip()
+                # Best-effort file path
+                if ctx["cwd"]:
+                    ctx["file"] = os.path.join(ctx["cwd"], filename)
+                else:
+                    ctx["file"] = filename
+        
+        return ctx
     except Exception:
-        return "", ""
+        return ctx
 
 
 def _is_excluded(window_title: str, process_name: str, settings) -> bool:
@@ -119,7 +143,8 @@ class ActivityMonitor:
         while self._running:
             try:
                 settings = get_settings()
-                title, app = _get_active_window()
+                ctx = _get_active_context()
+                title, app = ctx["title"], ctx["app"]
                 now = time.time()
 
                 # Track last activity time
@@ -145,7 +170,7 @@ class ActivityMonitor:
                         reason = "periodic"
 
                 if should_capture:
-                    self._do_capture(title, app, "", reason)
+                    self._do_capture(ctx, "", reason)
 
                 self._last_title = title
                 self._last_app = app
@@ -167,9 +192,10 @@ class ActivityMonitor:
                         clip = ""
 
                     if clip and clip != self._last_clipboard:
-                        title, app = _get_active_window()
+                        ctx = _get_active_context()
+                        title, app = ctx["title"], ctx["app"]
                         if not _is_excluded(title, app, settings):
-                            self._do_capture(title, app, clip, "clipboard")
+                            self._do_capture(ctx, clip, "clipboard")
                         self._last_clipboard = clip
 
             except Exception as exc:
@@ -179,8 +205,7 @@ class ActivityMonitor:
 
     def _do_capture(
         self,
-        window_title: str,
-        app_name: str,
+        ctx: dict,
         clipboard_text: str,
         reason: str,
     ) -> None:
@@ -189,10 +214,14 @@ class ActivityMonitor:
 
         event = Event(
             timestamp=datetime.utcnow(),
-            app_name=app_name,
-            window_title=window_title,
+            app_name=ctx.get("app", ""),
+            window_title=ctx.get("title", ""),
             clipboard_text=clipboard_text[:2000],     # cap clipboard length
             screenshot_path=screenshot_path,
+            cwd=ctx.get("cwd", ""),
+            repo=ctx.get("repo", ""),
+            file_path=ctx.get("file", ""),
+            url=ctx.get("url", ""),
         )
 
         # Assign session
@@ -210,5 +239,5 @@ class ActivityMonitor:
 
         logger.debug(
             "Captured [%s]: app=%s title=%s",
-            reason, app_name[:40], window_title[:60],
+            reason, ctx.get("app", "")[:40], ctx.get("title", "")[:60],
         )

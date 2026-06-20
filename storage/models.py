@@ -38,6 +38,10 @@ class Event(BaseModel):
     topics: List[str] = Field(default_factory=list)
     session_id: str = ""
     embedding_id: str = ""        # FAISS row index (stored as string)
+    file_path: str = ""
+    url: str = ""
+    repo: str = ""
+    cwd: str = ""
     processed: bool = False       # True once AI pipeline has run
 
 
