@@ -69,7 +69,7 @@ def build_ui():
             "font-size:11px;color:#6366f1;margin-bottom:32px"
         )
 
-        status_html = ui.html("", sanitize=False).style("margin-bottom:24px")
+        status_html = ui.html("").style("margin-bottom:24px")
 
         nav_items = [
             ("brain", "Brain"),
@@ -88,7 +88,7 @@ def build_ui():
             )
             nav_labels[tab_id] = btn
 
-        main_area = ui.element("div").classes("main-content")
+    main_area = ui.element("div").classes("main-content")
 
     # ── Status refresh ────────────────────────────────────────────────────
     async def refresh_status():
@@ -214,8 +214,7 @@ def _render_result_card(ev: dict, score: float):
         if ev.get("screenshot_path"):
             ui.html(
                 f'<img src="{escape(_screenshot_src(ev_id), quote=True)}" class="thumb" '
-                f'onerror="this.style.display=\'none\'">',
-                sanitize=False,
+                f'onerror="this.style.display=\'none\'">'
             )
 
         with ui.element("div").style("flex:1;min-width:0"):
@@ -225,8 +224,7 @@ def _render_result_card(ev: dict, score: float):
             with ui.row().style("align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap"):
                 if app_name:
                     ui.html(
-                        f'<span class="oc-pill oc-pill-accent">{escape(app_name[:30])}</span>',
-                        sanitize=False,
+                        f'<span class="oc-pill oc-pill-accent">{escape(app_name[:30])}</span>'
                     )
                 ui.label(title[:80]).style(
                     "font-size:14px;font-weight:600;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
@@ -240,15 +238,14 @@ def _render_result_card(ev: dict, score: float):
             # Topics + time
             with ui.row().style("align-items:center;gap:8px;flex-wrap:wrap"):
                 for topic in (ev.get("topics") or [])[:4]:
-                    ui.html(f'<span class="oc-pill">{escape(str(topic))}</span>', sanitize=False)
+                    ui.html(f'<span class="oc-pill">{escape(str(topic))}</span>')
                 ts = _fmt_time(ev.get("timestamp", ""))
                 ui.label(ts).style("font-size:11px;color:#4b5563;margin-left:auto")
 
             # Score bar
             bar_w = min(100, int(score * 500))
             ui.html(
-                f'<div class="score-bar" style="width:{bar_w}%;margin-top:8px"></div>',
-                sanitize=False,
+                f'<div class="score-bar" style="width:{bar_w}%;margin-top:8px"></div>'
             )
 
 
@@ -269,8 +266,7 @@ def build_timeline_tab(state: AppState):
             with container:
                 if not events:
                     ui.html('<div class="empty-state"><div style="font-size:48px">📋</div>'
-                            '<div style="margin-top:16px">No captures yet</div></div>',
-                            sanitize=False)
+                            '<div style="margin-top:16px">No captures yet</div></div>')
                     return
                 prev_day = None
                 for ev in events:
@@ -313,8 +309,7 @@ def build_sessions_tab(state: AppState):
                 if not sessions:
                     ui.html('<div class="empty-state" style="grid-column:1/-1">'
                             '<div style="font-size:48px">📂</div>'
-                            '<div style="margin-top:16px">No sessions yet</div></div>',
-                            sanitize=False)
+                            '<div style="margin-top:16px">No sessions yet</div></div>')
                     return
                 for s in sessions:
                     with ui.element("div").classes("oc-card"):

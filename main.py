@@ -72,7 +72,7 @@ def main():
 
     # 3. Start pipeline worker (consumer)
     logger.info("Starting pipeline worker thread...")
-    _worker = PipelineWorker(queue=_event_queue)
+    _worker = PipelineWorker(pipeline_queue=_event_queue)
     _worker.start()
 
     # 4. Enqueue previously unprocessed events (e.g. from a crash)
@@ -81,7 +81,7 @@ def main():
 
     # 5. Start capture monitor (producer)
     logger.info("Starting capture monitor thread (paused=%s)...", start_paused)
-    _monitor = ActivityMonitor(queue=_event_queue, start_paused=start_paused)
+    _monitor = ActivityMonitor(pipeline_queue=_event_queue, start_paused=start_paused)
     _monitor.start()
 
     # Share monitor with API so the UI can toggle pause state
