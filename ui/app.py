@@ -6,7 +6,7 @@ import asyncio
 import base64
 import logging
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from html import escape
 from pathlib import Path
 from typing import List, Optional
@@ -35,7 +35,9 @@ async def _api(method: str, path: str, **kwargs):
 def _fmt_time(iso: str) -> str:
     try:
         dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
-        return dt.strftime("%b %d, %H:%M")
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone().strftime("%b %d, %H:%M")
     except Exception:
         return iso[:16]
 
@@ -329,6 +331,10 @@ def build_timeline_tab(state: AppState):
     async def load_events():
         try:
             events = await _api("get", "/events", params={"limit": 50})
+            if events == getattr(container, "_last_events", None):
+                return  # Skip re-render if data hasn't changed
+            container._last_events = events
+            
             container.clear()
             with container:
                 if not events:
@@ -339,7 +345,10 @@ def build_timeline_tab(state: AppState):
                 for ev in events:
                     ts = ev.get("timestamp", "")
                     try:
-                        day = datetime.fromisoformat(ts.replace("Z", "+00:00")).strftime("%A, %B %d")
+                        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                        if dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        day = dt.astimezone().strftime("%A, %B %d")
                     except Exception:
                         day = ts[:10]
                     if day != prev_day:
@@ -350,10 +359,9 @@ def build_timeline_tab(state: AppState):
                         prev_day = day
                     _render_result_card(ev, 0)
         except Exception as exc:
-            with container:
-                ui.label(f"Failed to load: {exc}").style("color:#ef4444")
+            pass
 
-    ui.timer(0.1, load_events, once=True)
+    ui.timer(2.0, load_events)
 
 
 # ── Sessions tab ──────────────────────────────────────────────────────────
