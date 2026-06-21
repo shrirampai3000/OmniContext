@@ -215,7 +215,8 @@ def _open_event_modal(ev: dict):
         # Image
         ev_id = ev.get("id", "")
         if ev.get("screenshot_path"):
-            _safe_html(f'<img src="{escape(_screenshot_src(ev_id), quote=True)}" style="width:100%;border-radius:12px;margin-bottom:24px;border:1px solid var(--border)">')
+            src_escaped = escape(_screenshot_src(ev_id), quote=True)
+            _safe_html(f'<a href="{src_escaped}" target="_blank"><img src="{src_escaped}" style="width:100%;border-radius:12px;margin-bottom:24px;border:1px solid var(--border);cursor:zoom-in"></a>')
 
         # Action Bar (Deep Links)
         file_path = ev.get("file_path", "")
@@ -228,11 +229,11 @@ def _open_event_modal(ev: dict):
         # Context Overview
         with ui.column().style("gap:8px;margin-bottom:16px;background:var(--bg-base);padding:16px;border-radius:12px;border:1px solid var(--border)"):
             ui.label("Context Overview").style("font-size:14px;font-weight:700;color:var(--accent);margin-bottom:8px;text-transform:uppercase")
-            if repo: ui.html(f'<span style="color:var(--text-muted);font-weight:600;min-width:80px;display:inline-block">Repo:</span> {escape(repo)}')
-            if file_path: ui.html(f'<span style="color:var(--text-muted);font-weight:600;min-width:80px;display:inline-block">File:</span> {escape(file_path)}')
-            if cwd: ui.html(f'<span style="color:var(--text-muted);font-weight:600;min-width:80px;display:inline-block">Folder:</span> {escape(cwd)}')
-            if page_title: ui.html(f'<span style="color:var(--text-muted);font-weight:600;min-width:80px;display:inline-block">Page:</span> {escape(page_title)}')
-            ui.html(f'<span style="color:var(--text-muted);font-weight:600;min-width:80px;display:inline-block">App:</span> {escape(app_name)}')
+            if repo: _safe_html(f'<span style="color:var(--text-muted);font-weight:600;min-width:80px;display:inline-block">Repo:</span> {escape(repo)}')
+            if file_path: _safe_html(f'<span style="color:var(--text-muted);font-weight:600;min-width:80px;display:inline-block">File:</span> {escape(file_path)}')
+            if cwd: _safe_html(f'<span style="color:var(--text-muted);font-weight:600;min-width:80px;display:inline-block">Folder:</span> {escape(cwd)}')
+            if page_title: _safe_html(f'<span style="color:var(--text-muted);font-weight:600;min-width:80px;display:inline-block">Page:</span> {escape(page_title)}')
+            _safe_html(f'<span style="color:var(--text-muted);font-weight:600;min-width:80px;display:inline-block">App:</span> {escape(app_name)}')
 
         with ui.row().style("gap:12px;margin-bottom:24px;align-items:center"):
             if file_path:
@@ -263,7 +264,7 @@ def _open_event_modal(ev: dict):
 
         # Details
         with ui.column().style("gap:8px"):
-            if ev.get("summary"): ui.html(f'<b>Summary:</b> {escape(ev.get("summary", ""))}')
+            if ev.get("summary"): _safe_html(f'<b>Summary:</b> {escape(ev.get("summary", ""))}')
             if ev.get("ocr_text"): 
                 with ui.expansion("OCR Text").style("width:100%"):
                     ui.label(ev.get("ocr_text", "")).style("white-space:pre-wrap;font-size:12px;color:var(--text-muted);font-family:monospace")

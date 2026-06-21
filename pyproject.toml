@@ -24,6 +24,7 @@ dependencies = [
     "faiss-cpu>=1.8.0",
     "keyboard>=0.13.5",
     "pystray>=0.19.5",
+    "tf-keras>=2.16.0",
 ]
 
 [project.optional-dependencies]

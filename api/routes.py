@@ -177,7 +177,7 @@ def get_brain():
     return get_brain_view()
 
 
-@router.get("/brain/cluster/{entity_name}", tags=["graph"])
+@router.get("/brain/cluster/{entity_name:path}", tags=["graph"])
 def get_cluster(entity_name: str):
     """Drill-down for a single topic cluster / entity hub."""
     from graph.clusterer import get_cluster_detail
