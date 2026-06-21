@@ -15,6 +15,45 @@ Operating entirely on your local machine, OmniContext captures context-aware sna
 - **Hybrid Retrieval Engine:** Combines keyword search (SQLite FTS5) with semantic vector search (FAISS) using Reciprocal Rank Fusion (RRF), further optimized with recency boosting.
 - **Premium UI:** Features a beautifully designed, desktop-style web interface using a pristine light-mode glassmorphism aesthetic, backed by a fully documented REST API.
 
+## Feature Roadmap & Implementation Status
+
+Below is a comprehensive checklist of the features conceptualised for the MVP and their current implementation status. This list serves as the source of truth for project completeness.
+
+### 1. Foundation & Data Layer
+- [x] **Local Storage:** SQLite database for metadata and FTS5 for fast keyword search.
+- [x] **Vector Database:** In-memory FAISS index with disk persistence for semantic search.
+- [x] **Thread-safe Operations:** Concurrency locks to prevent race conditions during background processing.
+- [x] **Settings Management:** Persistent, file-backed configuration system decoupled from the repository (`%LOCALAPPDATA%`).
+
+### 2. Capture & Activity Monitoring
+- [x] **Smart Triggers:** Capture based on window changes, clipboard updates, and periodic active intervals.
+- [x] **Session Grouping:** Automatic clustering of raw events into continuous work sessions based on idle gaps.
+- [x] **Privacy Exclusions:** Granular ignore lists for sensitive apps (e.g., password managers) and private browsing windows.
+- [x] **Clipboard Control:** Opt-in toggle for capturing clipboard contents to prevent accidental leakages.
+
+### 3. AI Processing Pipeline
+- [x] **Optical Character Recognition (OCR):** Lazy-loaded EasyOCR for extracting text from screenshots.
+- [x] **Multimodal Summarization:** Deep integration with Ollama (LLaVA for vision, Mistral for text fallback) to generate summaries and extract entities.
+- [x] **Semantic Embeddings:** SentenceTransformers integration for generating high-dimensional vectors.
+- [x] **Graceful Degradation:** The pipeline continues to function even if specific AI models (like Ollama) are offline.
+
+### 4. Digital Brain & Knowledge Graph
+- [x] **Entity Extraction:** Automatic identification of topics and entities from captures.
+- [x] **Relationship Linking:** Generation of `memory_links` to connect events to their extracted entities and sessions.
+- [x] **Time-Windowed Clustering:** Dynamic grouping of memories by topic across Today, This Week, and This Month.
+
+### 5. Context Extractors & Deep Linking
+- [x] **Process Context:** Extraction of process ID, application name, and window title.
+- [x] **Developer Context:** Detection of Current Working Directory (`cwd`) and Git Root (`repo`) for VS Code and terminal sessions.
+- [x] **Browser Context:** Intelligent parsing of browser window titles to extract clean page titles.
+- [x] **"Return to Context" Actions:** UI buttons to *Open File*, *Open Folder*, *Open URL*, and *Copy Path* directly from a memory card.
+
+### 6. User Interface & API
+- [x] **NiceGUI Web Interface:** Clean, dark/light compatible dashboard with sidebar navigation.
+- [x] **Hybrid Search:** Reciprocal Rank Fusion (RRF) combining keyword and semantic scores, boosted by recency.
+- [x] **Timeline View:** Chronological feed of all recorded memories.
+- [x] **RESTful API:** Complete FastAPI backend exposing endpoints for all core functionalities.
+
 ## System Requirements
 
 - **Operating System:** Windows 10 or Windows 11
